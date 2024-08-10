@@ -6,8 +6,10 @@ set -e
 
 # install stow, make, cmake, gettext
 
-# download and install zimfw (modules will be loaded from .zimrc)
-curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
+# # download and install zimfw (modules will be loaded from .zimrc)
+# if [[ ! -d $HOME/.zim ]]; then
+#     curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
+# fi
 
 # Setup nvim
 NVIM=$HOME/.local/
@@ -78,13 +80,6 @@ if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
 fi
 
 stow .
-
-# install zsh
-if command -v zsh > /dev/null; then
-    echo "Zsh appears to be installed"
-else
-    sudo apt-get install zsh
-fi
 
 # Setup zsh
 # Need an alternative where exec zsh is added to .bashrc
