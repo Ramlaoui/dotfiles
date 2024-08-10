@@ -21,7 +21,7 @@ XDG_DATA_HOME=$HOME/.local/share
 ZSH_HOME=$XDG_CONFIG_HOME/zsh
     
 # Prezto
-if [[ ! -d $ZSH_HOME/prezto ]]; then
+if [[ ! -d $ZSH_HOME/.zprezto ]]; then
     git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-${XDG_CONFIG_HOME:-$HOME/.config}/zsh}/.zprezto"
 fi
 
