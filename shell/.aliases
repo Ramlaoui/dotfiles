@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# Custom functions
+
+copy_pwd() {
+    pwd | pbcopy
+}
+
+alias stage="cd /Users/aliramlaoui/Google\ Drive/My\ Drive/stage/"
+
+export DRIVE="/Users/aliramlaoui/Google Drive/My Drive/"
+export COURS="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A"
+cours() {
+    cd /Users/aliramlaoui/Google\ Drive/My\ Drive/Cours\ 3A
+}
+
+fun() {
+    cd /Users/aliramlaoui/Google\ Drive/My\ Drive/fun
+}
+
+ritz() {
+    cd "$DRIVE"ritz
+}
+
+function latexnote() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_template/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+function latexbeamer() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_beamer/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+function latexcs() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_cs/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+editrc() {
+    nvim ~/.zshrc
+}
+
+vault() {
+    cd /Users/aliramlaoui/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/Obsidian\ Vault
+}
+
+vaultcourse() {
+    cd /Users/aliramlaoui/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/Obsidian\ Vault/CSMVA
+}
+
+latexsnippets() {
+    nvim ~/.config/nvim/my_snippets/tex.snippets
+}
+
+nvimconfig() {
+    cd ~/.config/nvim
+}
+
+tmuxconfig() {
+    nvim ~/.config/tmux/.tmux.conf
+}
+
+export EDITOR=nvim
