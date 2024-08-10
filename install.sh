@@ -11,6 +11,8 @@ set -e
 #     curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
 # fi
 
+stow .
+
 # Setup nvim
 NVIM=$HOME/.local/
 mkdir -p $NVIM
@@ -79,7 +81,6 @@ if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
 		expect -c "spawn ./tmux-thumbs-install.sh; send \"\r2\r\"; expect complete" 1>/dev/null
 fi
 
-stow .
 
 # Setup zsh
 # Need an alternative where exec zsh is added to .bashrc
