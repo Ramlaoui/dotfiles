@@ -1,4 +1,5 @@
 ZSH_DIR=$HOME/.config/zsh
+ZDOTDIR=$HOME/.config/zsh
 
 [[ $- != *i* ]] && return # if not interactive shell, return
 
@@ -14,7 +15,7 @@ ZSH_DIR=$HOME/.config/zsh
 [[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
 
 # source Prezto
-source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
+source "${ZDOTDIR}/.zprezto/init.zsh"
 
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
