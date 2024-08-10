@@ -12,9 +12,9 @@ set -e
 # fi
 
 stow zsh \
-    # git \
     tmux \
     nvim
+    # git \
 
 # Setup nvim
 NVIM=$HOME/.local/
