@@ -31,7 +31,7 @@ else
     echo "Installing Starship..."
     echo "Attempting to install Starship in /usr/bin..."
 
-    if curl -sS https://starship.rs/install.sh | yes | sh; then
+    if curl -sS https://starship.rs/install.sh | sh -s; then
         echo "Starship installed successfully in /usr/bin."
     else
         echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
@@ -45,11 +45,6 @@ else
         fi
     fi
 fi
-
-
-# add prompt_starship_setup function to Prezto
-ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-~}/.zprezto}
-echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
 
 # Setup nvim
 NVIM=$HOME/.local/

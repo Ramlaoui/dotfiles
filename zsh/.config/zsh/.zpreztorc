@@ -1,7 +1,6 @@
 # Set the Prezto modules to load (browse modules).
 # The order matters.
-zstyle ':prezto:load' starship \
-  'autosuggestions'
+zstyle ':prezto:load' 'autosuggestions' \
   'syntax-highlighting'
   #'environment' \
   #'terminal' \

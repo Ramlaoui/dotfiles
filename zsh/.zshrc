@@ -14,6 +14,9 @@ ZDOTDIR=$HOME/.config/zsh
 # Source functions
 [[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
 
+# Source starship
+eval "$(starship init zsh)"
+
 # source Prezto
 source "${ZDOTDIR}/.zprezto/init.zsh"
 
