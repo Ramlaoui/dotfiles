@@ -7,4 +7,4 @@ vim.cmd([[
   autocmd VimEnter * set wrap
 ]])
 
-vim.g.python3_host_prog = "/path/to/py3nvim/bin/python"
+vim.g.python3_host_prog = "$XDG_DATA_HOME/nvim/py3/bin/python3"

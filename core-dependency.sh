@@ -4,6 +4,7 @@
 
 core_packages=(
     "git" # Manage dependencies and dotfiles
+    "python3-venv" # Python virtual environments
     "curl" # Download files
     "nvim" # Text editor
     "zsh" # Shell
