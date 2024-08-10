@@ -2,39 +2,12 @@
 
 set -e
 
-if [ -e .stow-debian ]
-then
-    sudo apt-get install stow
-    exit 0;
-fi
+./core-dependency.sh
 
-PATH=$HOME/.local/bin:$PATH
-source perl/.perlenv
+# install stow, make, cmake, gettext
 
-cd build
-cpanm --local-lib=$PERL_LOCAL_LIB_ROOT local::lib Module::Build IO::Scalar
-cpanm --installdeps .
-
-
-# Install script
-# Pull repo
-
- 
-
-# Install tmux
-
-
-
-# Install zsh
-
-
-
-# Install nvim
-git clone git@github.com:neovim/neovim.git -b stable $HOME/.local/src/neovim
-cd $HOME/.local/src/neovim
-make CMAKE_BUILD_TYPE=Release
-make CMAKE_INSTALL_PREFIX=$HOME/.local install
-# put it in separate script
+# download and install zimfw (modules will be loaded from .zimrc)
+curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
 
 # Setup nvim
 NVIM=$HOME/.local/
@@ -52,22 +25,43 @@ else
     cd -
 fi
 
-# Create Python3 environment
-if [[ ! -d $NVIM/py3 ]]; then
-    python3 -m venv $NVIM/py3
-    PIP=$NVIM/py3/bin/pip
-    $PIP install --upgrade pip
-    $PIP install neovim
-    $PIP install 'python-language-server[all]'
-    $PIP install pylint isort jedi flake8
-    $PIP install black yapf
-fi
+
+# # Create separate Python3 environment for neovim
+# NVIM_VENVS=$HOME/.local/share/nvim/
+# if [[ ! -d $NVIM_VENVS/py3 ]]; then
+#     python3 -m venv $NVIM_VENVS/py3
+#     PIP=$NVIM_VENVS/py3/bin/pip
+#     $PIP install --upgrade pip
+#     $PIP install neovim
+#     $PIP install 'python-language-server[all]'
+#     $PIP install pylint isort jedi flake8
+#     $PIP install black yapf
+# fi
+
+# # Create Python3 global environment
+# python3 -m pip -V
+# python3 -m pip install --upgrade pip
+# python3 -m pip install --no-wardn-script-location \
+#     neovim \ 
+#     pylint isort jedi flake8 \
+#     black yapf
+#
+# add this to init.lua
+# let g:python3_host_prog = '/path/to/py3nvim/bin/python'
+
 
 # Create node env
 if [[ ! -d $NVIM/node ]]; then
     mkdir -p $NVIM/node
     NODE_SCRIPT=/tmp/install-node.sh
-    curl -sL install-node.now.sh/lts -o $NODE_SCRIPT
+    if command -v curl > /dev/null; then
+        $DOWNLOAD_CMD="curl -sL install-node.now.sh/lts -o $NODE_SCRIPT"
+    elif command -v wget > /dev/null; then
+        $DOWNLOAD_CMD="wget -qO $NODE_SCRIPT install-node.now.sh/lts"
+    else
+        echo "ERROR: Neither curl nor wget is available"
+        exit 1
+    fi
     chmod +x $NODE_SCRIPT
     PREFIX=$NVIM/node $NODE_SCRIPT -y
     PATH="$NVIM/node/bin:$PATH"
@@ -77,62 +71,24 @@ fi
 # Setup tmux
 if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
     mkdir -p $HOME/.tmux/plugins
-    git clone https://github.com/tmux-plugins/tpm $HOME/.tmux/plugins/tpm
+    git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm
+    ~/.config/tmux/plugins/tpm/scripts/install_plugins.sh &&
+	cd ~/.config/tmux/plugins/tmux-thumbs &&
+		expect -c "spawn ./tmux-thumbs-install.sh; send \"\r2\r\"; expect complete" 1>/dev/null
 fi
-pull_repo $HOME/.tmux/plugins/tpm
 
+stow .
+
+# install zsh
+if command -v zsh > /dev/null; then
+    echo "Zsh appears to be installed"
+else
+    sudo apt-get install zsh
+fi
 
 # Setup zsh
-# setup zsh as main shell
+# Need an alternative where exec zsh is added to .bashrc
 chsh -s $(which zsh)
-
-# download and install zimfw (modules will be loaded from .zimrc)
-curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
-
-
-# setup env
-SELF=$(basename $0)
-SELFDIR=$(readlink -f $(dirname $0))
-
-source perl/.perlenv
-PATH=$HOME/.local/bin:$PATH
-
-set +e
-
-# Cleanup all old legacy stuf first
-for i in $(find $HOME -maxdepth 1 -type l);
-do
-    found=$(readlink -e $i)
-    if [ -z $found ]
-    then
-        echo "Unable to find $i"
-        rm $i
-    fi
-done
-
-set -e
-
-for i in .profile .bashrc .zshrc .xscreensaverrc
-do
-    [ -f "$HOME/$i" ] && rm "$HOME/$i"
-done
-
-stow stow \
-  # x11 \
-  zsh \
-  nvim \
-  # scripts \
-  apps \
-  # perl \
-  git
-
-# On install time determine if this is debian
-# then stow, otherwise stow -D debian
-stow debian
-
-if [ ! -e $HOME/.env.local ] ; then
-    cp $SELFDIR/env.local $HOME/.env.local
-fi
 
 exit 0
 

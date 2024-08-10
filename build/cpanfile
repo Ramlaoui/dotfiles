@@ -1,2 +1,0 @@
-requires 'Stow'           => 0;
-requires 'App::cpanminus' => 0;
