@@ -56,6 +56,7 @@ return {
 				{ name = "path" }, -- file system paths
 				{ name = "latex_symbols" }, -- latex symbols
 				{ name = "vimtex" }, -- vimtex completion
+				{ name = "orgmode" }, -- orgmode completion
 			}),
 			-- configure lspkind for vs-code like pictograms in completion menu
 			formatting = {

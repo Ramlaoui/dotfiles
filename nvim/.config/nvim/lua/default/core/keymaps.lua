@@ -1,6 +1,6 @@
 -- set leader key to space
 vim.g.mapleader = " "
-vim.g.maplocalloader = ";" -- use ; to load local keymaps
+vim.g.maplocalleader = "g" -- use ; to load local keymaps
 
 local keymap = vim.keymap -- for conciseness
 
@@ -31,3 +31,14 @@ keymap.set("n", "<leader>tx", "<cmd>tabclose<CR>", { desc = "Close current tab" 
 keymap.set("n", "<leader>tk", "<cmd>tabn<CR>", { desc = "Go to next tab" }) --  go to next tab
 keymap.set("n", "<leader>tj", "<cmd>tabp<CR>", { desc = "Go to previous tab" }) --  go to previous tab
 keymap.set("n", "<leader>tf", "<cmd>tabnew %<CR>", { desc = "Open current buffer in new tab" }) --  move current buffer to new tab
+
+-- orgmode
+vim.api.nvim_create_autocmd("FileType", {
+	pattern = "org",
+	callback = function()
+		vim.keymap.set("i", "<S-CR>", '<cmd>lua require("orgmode").action("org_mappings.meta_return")<CR>', {
+			silent = true,
+			buffer = true,
+		})
+	end,
+})

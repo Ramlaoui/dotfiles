@@ -11,7 +11,7 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-require("lazy").setup({ { import = "ali.plugins" }, { import = "ali.plugins.lsp" } }, {
+require("lazy").setup({ { import = "default.plugins" }, { import = "default.plugins.lsp" } }, {
 	install = {
 		colorscheme = { "nightfly" },
 	},

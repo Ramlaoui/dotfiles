@@ -25,8 +25,6 @@ if [[ ! -d $ZSH_HOME/prezto ]]; then
     git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-${XDG_CONFIG_HOME:-$HOME/.config}/zsh}/.zprezto"
 fi
 
-source $ZSH_HOME/.zshrc
-
 # Setup nvim
 NVIM=$HOME/.local/
 mkdir -p $NVIM
