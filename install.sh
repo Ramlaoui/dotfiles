@@ -31,7 +31,7 @@ else
     echo "Installing Starship..."
     echo "Attempting to install Starship in /usr/bin..."
 
-    if curl -sS https://starship.rs/install.sh | sh --yes; then
+    if curl -sS https://starship.rs/install.sh | yes | sh; then
         echo "Starship installed successfully in /usr/bin."
     else
         echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
@@ -43,6 +43,7 @@ else
             echo "Installation in ~/.local/bin failed as well."
             exit 1
         fi
+    fi
 fi
 
 

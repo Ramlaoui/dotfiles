@@ -13,13 +13,8 @@ ZSH_DIR=$HOME/.config/zsh
 # Source functions
 [[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
 
-# install starship if  we haven't already
-command -v starship &>/dev/null || sh -c "$(curl -fsSL https://starship.rs/install.sh)"
-
-# add prompt_starship_setup function to Prezto
-ZPREZTODIR=$XDG_CONFIG_HOME/zsh/.zprezto
-echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
-
+# source Prezto
+source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
