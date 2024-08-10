@@ -63,28 +63,17 @@ else
 fi
 
 
-# # Create separate Python3 environment for neovim
-# NVIM_VENVS=$HOME/.local/share/nvim/
-# if [[ ! -d $NVIM_VENVS/py3 ]]; then
-#     python3 -m venv $NVIM_VENVS/py3
-#     PIP=$NVIM_VENVS/py3/bin/pip
-#     $PIP install --upgrade pip
-#     $PIP install neovim
-#     $PIP install 'python-language-server[all]'
-#     $PIP install pylint isort jedi flake8
-#     $PIP install black yapf
-# fi
-
-# # Create Python3 global environment
-# python3 -m pip -V
-# python3 -m pip install --upgrade pip
-# python3 -m pip install --no-wardn-script-location \
-#     neovim \ 
-#     pylint isort jedi flake8 \
-#     black yapf
-#
-# add this to init.lua
-# let g:python3_host_prog = '/path/to/py3nvim/bin/python'
+# Create separate Python3 environment for neovim
+NVIM_VENVS=$HOME/.local/share/nvim/
+if [[ ! -d $NVIM_VENVS/py3 ]]; then
+    python3 -m venv $NVIM_VENVS/py3
+    PIP=$NVIM_VENVS/py3/bin/pip
+    $PIP install --upgrade pip
+    $PIP install neovim
+    $PIP install 'python-language-server[all]'
+    $PIP install pylint isort jedi flake8
+    $PIP install black yapf
+fi
 
 
 # Create node env
