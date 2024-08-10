@@ -25,7 +25,26 @@ if [[ ! -d $ZSH_HOME/.zprezto ]]; then
 fi
 
 # starship
-command -v starship &>/dev/null || sh -c "$(curl -fsSL https://starship.rs/install.sh)"
+if -v starship &>/dev/null ; then
+    echo "Starship is already installed"
+else
+    echo "Installing Starship..."
+    echo "Attempting to install Starship in /usr/bin..."
+
+    if curl -sS https://starship.rs/install.sh | sh --yes; then
+        echo "Starship installed successfully in /usr/bin."
+    else
+        echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
+        # If the installation to /usr/bin fails, try installing to ~/.local/bin
+        if curl -sS https://starship.rs/install.sh | sh -s -- --bin-dir ~/.local/bin --yes; then
+            echo "Starship installed successfully in ~/.local/bin."
+            echo 'Make sure ~/.local/bin is in your PATH.'
+        else
+            echo "Installation in ~/.local/bin failed as well."
+            exit 1
+        fi
+fi
+
 
 # add prompt_starship_setup function to Prezto
 ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-~}/.zprezto}
