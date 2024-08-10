@@ -11,7 +11,10 @@ set -e
 #     curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
 # fi
 
-stow .
+stow zsh \
+    # git \
+    tmux \
+    nvim
 
 # Setup nvim
 NVIM=$HOME/.local/
