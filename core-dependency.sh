@@ -7,6 +7,7 @@ core_packages=(
     "curl" # Download files
     "nvim" # Text editor
     "zsh" # Shell
+    "stow" # Dotfile manager (symlinks)
 )
 
 # Color variables
