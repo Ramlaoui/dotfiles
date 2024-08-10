@@ -5,7 +5,6 @@ set -e
 ./core-dependency.sh
 
 # install stow, make, cmake, gettext
-
 # # download and install zimfw (modules will be loaded from .zimrc)
 # if [[ ! -d $HOME/.zim ]]; then
 #     curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
@@ -24,6 +23,13 @@ ZSH_HOME=$XDG_CONFIG_HOME/zsh
 if [[ ! -d $ZSH_HOME/.zprezto ]]; then
     git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-${XDG_CONFIG_HOME:-$HOME/.config}/zsh}/.zprezto"
 fi
+
+# starship
+command -v starship &>/dev/null || sh -c "$(curl -fsSL https://starship.rs/install.sh)"
+
+# add prompt_starship_setup function to Prezto
+ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-~}/.zprezto}
+echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
 
 # Setup nvim
 NVIM=$HOME/.local/
@@ -85,8 +91,8 @@ if [[ ! -d $NVIM/node ]]; then
 fi
 
 # Setup tmux
-if [[ ! -d $HOME/.tmux/plugins/tpm ]]; then
-    mkdir -p $HOME/.tmux/plugins
+if [[ ! -d $XDG_CONFIG_HOME/tmux/plugins/tpm ]]; then
+    mkdir -p $XDG_CONFIG_HOME/tmux/plugins
     git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm
     ~/.config/tmux/plugins/tpm/scripts/install_plugins.sh &&
 	cd ~/.config/tmux/plugins/tmux-thumbs &&

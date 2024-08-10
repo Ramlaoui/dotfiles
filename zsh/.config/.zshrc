@@ -4,21 +4,20 @@ ZSH_DIR=$HOME/.config/zsh
 
 # Source 
 
-
 # Source exports
-[[ ! -f $ZSH_DIR/exports.zsh ]] || source $ZSH_DIR/exports.zsh
+[[ ! -f $ZSH_DIR/.exports ]] || source $ZSH_DIR/.exports
 
 # Source aliases
-[[ ! -f $ZSH_DIR/aliases.zsh ]] || source $ZSH_DIR/aliases.zsh
+[[ ! -f $ZSH_DIR/.aliases ]] || source $ZSH_DIR/.aliases
 
 # Source functions
-[[ ! -f $ZSH_DIR/functions.zsh ]] || source $ZSH_DIR/functions.zsh
+[[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
 
 # install starship if  we haven't already
 command -v starship &>/dev/null || sh -c "$(curl -fsSL https://starship.rs/install.sh)"
 
 # add prompt_starship_setup function to Prezto
-ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-~}/.zprezto}
+ZPREZTODIR=$XDG_CONFIG_HOME/zsh/.zprezto
 echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
 
 
@@ -273,3 +272,4 @@ tmuxconfig() {
 }
 
 export EDITOR=nvim
+
