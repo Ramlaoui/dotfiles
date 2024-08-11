@@ -1,0 +1,1 @@
+eval "$(starship init zsh)" /Users/aliramlaoui/.zprezto/modules/prompt/functions/prompt_starship_setup

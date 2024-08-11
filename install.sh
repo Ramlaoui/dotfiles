@@ -4,7 +4,7 @@ set -e
 
 # install stow, make, cmake, gettext
 # # download and install zimfw (modules will be loaded from .zimrc)
-./core-dependency.sh
+./scripts/installs/core-dependency.sh
 
 # Setup tmux
 # ask for confirmation
@@ -12,7 +12,6 @@ read -p "Do you want to install tmux plugins? This will remove the current tmux 
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Skipping tmux plugin installation"
-    exit 0
 else
     echo "Installing tmux plugins..."
     rm -rf $HOME/.config/tmux/plugins
@@ -28,13 +27,8 @@ XDG_CONFIG_HOME=$HOME/.config
 XDG_DATA_HOME=$HOME/.local/share
 ZSH_HOME=$HOME/.zsh
     
-# prezto
-if [[ ! -d $ZSH_HOME/.zprezto ]]; then
-    git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
-fi
-
 # starship
-if -v starship &>/dev/null ; then
+if command -v starship > /dev/null; then
     echo "Starship is already installed"
 else
     echo "Installing Starship..."
@@ -53,6 +47,16 @@ else
             exit 1
         fi
     fi
+fi
+
+# prezto
+if [[ -d ${ZDOTDIR:-$HOME}/.zprezto ]]; then
+    echo "Prezto is already installed"
+else
+    git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
+    # # add prompt_starship_setup function to Prezto (was unable to make it work), load starship in .zshrc after prezto
+    # ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-$HOME}/.zprezto}
+    # echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
 fi
 
 # Setup nvim
@@ -76,13 +80,13 @@ fi
 NVIM_VENVS=$XDG_DATA_HOME/nvim
 if [[ ! -d $NVIM_VENVS/py3 ]]; then
     python3 -m venv $NVIM_VENVS/py3
-fi
     PIP=$NVIM_VENVS/py3/bin/pip
     $PIP install --upgrade pip
     $PIP install neovim
     $PIP install 'python-language-server[all]'
     $PIP install pylint isort jedi flake8 pyright
     $PIP install black yapf
+fi
 
 # Create node env
 NODE_ENV=$XDG_DATA_HOME/node

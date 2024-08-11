@@ -3,12 +3,6 @@ ZDOTDIR=$HOME # The only way to change this from the default is to set it in the
 
 [[ $- != *i* ]] && return # if not interactive shell, return
 
-# add in exports with XDG_HOME?
-# export PATH=$HOME/bin:/usr/local/bin:$PATH
-
-# vi mode
-bindkey -v
-
 # Source 
 
 # Source exports
@@ -20,11 +14,11 @@ bindkey -v
 # Source functions
 [[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
 
-# Source starship
-eval "$(starship init zsh)"
-
 # source Prezto
 source "${ZDOTDIR}/.zprezto/init.zsh"
+
+# Source starship
+eval "$(starship init zsh)"
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!

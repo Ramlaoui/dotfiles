@@ -1,21 +1,23 @@
 # Set the Prezto modules to load (browse modules).
 # The order matters.
-zstyle ':prezto:load' 'autosuggestions' \
-  'syntax-highlighting'
-  #'environment' \
-  #'terminal' \
-  #'editor' \
-  #'history' \
-  #'directory' \
-  #'spectrum' \
-  #'utility' \
-  #'completion' \
-  #'prompt' \
-  #'git' \
-  #'fasd' \
-  #'rsync' \
-  #'homebrew' \
-  #'osx' \
-  #'history-substring-search' \
-
+zstyle ':prezto:load' pmodule \
+    'autosuggestions' \
+    'syntax-highlighting' \
+    'editor' \
+    'history' \
+    'directory' \
+    'spectrum' \
+    'utility' \
+    'completion' \
+    'prompt' \
+    'git' \
+    'fasd' \
+    'rsync' \
+    'homebrew' \
+    'osx' \
+    'history-substring-search' \
+    'environment' \
+    'terminal'
+ 
+  
 zstyle ':prezto:module:editor' key-bindings 'vi'
