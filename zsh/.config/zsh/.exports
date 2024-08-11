@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 
-# Add exports here
-
+# Set XDG Base Directories
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:=$HOME/.config}"
 export XDG_DATA_HOME="$HOME/.local/share"
 
+# 
+export NPM_CONFIG_PREFIX="$XDG_DATA_HOME/node"
+
+# Set PATH
+export PATH="$HOME/.local/bin:$XDG_NPM_CONFIG_PREFIX/bin:$PATH"
+
+# Set ZDOTDIR to the default zsh config location
 [[ -d $XDG_CONFIG_HOME/zsh ]] && export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
-
-# preferred text editor
+# neovim as default editor
 export EDITOR=nvim
 export VISUAL=nvim
+export MANPAGER='nvim --cmd ":lua vim.g.noplugins=1" +Man!'
+export MANWIDTH=999
+
+# Set fuzzy finder
+export CM_LAUNCHER="fzf"
