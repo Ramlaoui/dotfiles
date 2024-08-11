@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
+# Heavily copied https://github.com/Lissy93/dotfiles/blob/master/install.sh
+
 set -e
+
+PARAMS=$*
+DOTFILES_DIR="${DOTFILES_DIR:-${SRC_DIR:-$HOME/dotfiles}}"
 
 # install stow, make, cmake, gettext
 # # download and install zimfw (modules will be loaded from .zimrc)

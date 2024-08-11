@@ -1,6 +1,88 @@
 #!/usr/bin/env bash
 
-# Custom functions
+# Aliases
+
+# fzf
+alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid --line-range :500 {}'"
+
+
+# General
+
+# Find + manage aliases
+alias al='alias | less' # List all aliases
+alias as='alias | grep' # Search aliases
+alias ar='unalias' # Remove given alias
+
+# Copy / pasting
+alias cpwd='pwd | pbcopy' # Copy current path
+alias pa='pbpaste' # Paste clipboard contents
+
+# Finding files and directories
+alias dud='du -d 1 -h' # List sizes of files within directory
+alias duf='du -sh *' # List total size of current directory
+alias ff='find . -type f -name' # Find a file by name within current directory
+(( $+commands[fd] )) || alias fd='find . -type d -name' # Find direcroy by name
+
+# External Services
+alias myip='curl icanhazip.com'
+
+# dotfiles
+alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
+
+# Tmux shortcuts
+alias tmux='tmux -u'
+alias t='tmux'
+alias ta='tmux attach-session -t'
+alias tn='tmux new-session -s'
+alias tl='tmux list-sessions'
+alias tk='tmux kill-session -t'
+
+# Tmux helpers
+function tsplit() {
+  tmux split-window -v "$@"
+}
+
+function tvsplit() {
+  tmux split-window -h "$@"
+}
+
+function tresize() {
+  tmux resize-pane -D "$@"
+}
+
+function tresizeh() {
+  tmux resize-pane -R "$@"
+}
+
+function tresizev() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizeleft() {
+  tmux resize-pane -L "$@"
+}
+
+function tresizeup() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizedown() {
+  tmux resize-pane -D "$@"
+}
+
+function tresizeup() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizeleft() {
+  tmux resize-pane -L "$@"
+}
+
+function tresizeright() {
+  tmux resize-pane -R "$@"
+}
+
+# Perso
 
 copy_pwd() {
     pwd | pbcopy

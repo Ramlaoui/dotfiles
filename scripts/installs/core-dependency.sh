@@ -2,12 +2,15 @@
 
 # Credits to https://raw.githubusercontent.com/Lissy93/dotfiles/HEAD/scripts/installs/prerequisites.sh
 
+# TODO: Separate core packages from optional packages
+
 core_packages=(
     "git" # Manage dependencies and dotfiles
     "python3-venv" # Python virtual environments
     "curl" # Download files
     "nvim" # Text editor
     "zsh" # Shell
+    "htop" # System monitor
     # "fzf" # Fuzzy finder
     "stow" # Dotfile manager (symlinks)
 )
