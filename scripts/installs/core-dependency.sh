@@ -8,6 +8,7 @@ core_packages=(
     "curl" # Download files
     "nvim" # Text editor
     "zsh" # Shell
+    # "fzf" # Fuzzy finder
     "stow" # Dotfile manager (symlinks)
 )
 
@@ -83,10 +84,6 @@ for app in ${core_packages[@]}; do
   fi
 done
 
-# All done
-echo -e "\n${PURPLE}Jobs complete, exiting${RESET}"
-exit 0
-
 # check if tmux is available
 if ! command -v tmux &> /dev/null
 then
@@ -103,9 +100,6 @@ then
 
     # add tmux to PATH (this should be in exports)
     export PATH=$HOME/.local/bin:$PATH
-
-else
-    echo "tmux is already installed"
 fi
 
 # check if nvim is available
@@ -132,10 +126,28 @@ if ! command -v nvim &> /dev/null; then
 fi
 
 
-else
-    echo "nvim is already installed"
-    exit 0
+
+# check if fzf is available
+if ! command -v fzf &> /dev/null; then
+    echo "fzf is not installed"
+
+    echo "Installing from source"
+
+    # Define the target directory
+    TARGET_DIR="$HOME/.fzf"
+
+    # Check if the repository is already cloned
+    if [ -d "$TARGET_DIR/.git" ]; then
+        echo "Repository already cloned at $TARGET_DIR"
+    else
+        # Clone the repository since it's not present
+        git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+~/.fzf/install
+    fi
+
 fi
 
-# download and install zimfw (modules will be loaded from .zimrc)
-curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
+# All done
+echo -e "\n${PURPLE}Jobs complete, exiting${RESET}"
+exit 0
+

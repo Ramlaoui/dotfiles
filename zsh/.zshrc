@@ -20,6 +20,18 @@ source "${ZDOTDIR}/.zprezto/init.zsh"
 # Source starship
 eval "$(starship init zsh)"
 
+# Problem with vi-mode and starship, this fixes it
+function zle-line-init zle-keymap-select {
+RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
+RPS2=$RPS1
+zle reset-prompt
+}
+zle -N zle-line-init
+zle -N zle-keymap-select
+
+# Source fzf
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
 __conda_setup="$('/opt/homebrew/Caskroom/miniconda/base/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
