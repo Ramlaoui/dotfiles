@@ -6,6 +6,20 @@ set -e
 # # download and install zimfw (modules will be loaded from .zimrc)
 ./core-dependency.sh
 
+# Setup tmux
+# ask for confirmation
+read -p "Do you want to install tmux plugins? This will remove the current tmux configuration [y/n] " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Skipping tmux plugin installation"
+    exit 0
+else
+    echo "Installing tmux plugins..."
+    rm -rf $XDG_CONFIG_HOME/tmux
+    mkdir -p $XDG_CONFIG_HOME/tmux/plugins
+    git clone --depth=1 https://github.com/tmux-plugins/tpm $TMUX_PLUGIN_MANAGER_PATH
+fi
+
 stow zsh \
     tmux \
     nvim
@@ -16,7 +30,7 @@ ZSH_HOME=$HOME/.zsh
     
 # prezto
 if [[ ! -d $ZSH_HOME/.zprezto ]]; then
-    git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-${XDG_CONFIG_HOME:-$HOME/.config}/zsh}/.zprezto"
+    git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
 fi
 
 # starship
@@ -87,14 +101,6 @@ if [[ ! -d $NODE_ENV ]]; then
     npm install -g neovim
 fi
 
-# Setup tmux
-if [[ ! -d $XDG_CONFIG_HOME/tmux/plugins/ ]]; then
-    mkdir -p $XDG_CONFIG_HOME/tmux/plugins
-    git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm &&
-        ~/.config/tmux/plugins/tpm/scripts/install_plugins.sh &&
-        cd ~/.config/tmux/plugins/tmux-thumbs &&
-		expect -c "spawn ./tmux-thumbs-install.sh; send \"\r2\r\"; expect complete" 1>/dev/null
-fi
 
 # Setup zsh
 # also need an alternative where exec zsh is added to .bashrc
