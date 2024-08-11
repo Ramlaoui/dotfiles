@@ -2,24 +2,19 @@
 
 set -e
 
-./core-dependency.sh
-
 # install stow, make, cmake, gettext
 # # download and install zimfw (modules will be loaded from .zimrc)
-# if [[ ! -d $HOME/.zim ]]; then
-#     curl -fsSL https://raw.githubusercontent.com/zimfw/install/master/install.zsh | zsh
-# fi
+./core-dependency.sh
 
 stow zsh \
     tmux \
     nvim
-    # git
 
 XDG_CONFIG_HOME=$HOME/.config
 XDG_DATA_HOME=$HOME/.local/share
 ZSH_HOME=$XDG_CONFIG_HOME/zsh
     
-# Prezto
+# prezto
 if [[ ! -d $ZSH_HOME/.zprezto ]]; then
     git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-${XDG_CONFIG_HOME:-$HOME/.config}/zsh}/.zprezto"
 fi
@@ -31,7 +26,7 @@ else
     echo "Installing Starship..."
     echo "Attempting to install Starship in /usr/bin..."
 
-    if curl -sS https://starship.rs/install.sh | sh -s; then
+    if curl -sS https://starship.rs/install.sh | yes | sh -s; then
         echo "Starship installed successfully in /usr/bin."
     else
         echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
@@ -64,48 +59,45 @@ fi
 
 
 # Create separate Python3 environment for neovim
-NVIM_VENVS=$HOME/.local/share/nvim/
+NVIM_VENVS=$XDG_DATA_HOME/nvim
 if [[ ! -d $NVIM_VENVS/py3 ]]; then
     python3 -m venv $NVIM_VENVS/py3
+fi
     PIP=$NVIM_VENVS/py3/bin/pip
     $PIP install --upgrade pip
     $PIP install neovim
     $PIP install 'python-language-server[all]'
     $PIP install pylint isort jedi flake8
     $PIP install black yapf
-fi
-
 
 # Create node env
-if [[ ! -d $NVIM/node ]]; then
-    mkdir -p $NVIM/node
-    NODE_SCRIPT=/tmp/install-node.sh
+NODE_ENV=$XDG_DATA_HOME/node
+if [[ ! -d $NODE_ENV ]]; then
+    mkdir -p $NODE_ENV
+    NODE_SCRIPT=$NODE_ENV/install-node.sh
     if command -v curl > /dev/null; then
         $DOWNLOAD_CMD="curl -sL install-node.now.sh/lts -o $NODE_SCRIPT"
-    elif command -v wget > /dev/null; then
-        $DOWNLOAD_CMD="wget -qO $NODE_SCRIPT install-node.now.sh/lts"
     else
-        echo "ERROR: Neither curl nor wget is available"
+        echo "ERROR: curl is not installed"
         exit 1
     fi
     chmod +x $NODE_SCRIPT
-    PREFIX=$NVIM/node $NODE_SCRIPT -y
-    PATH="$NVIM/node/bin:$PATH"
+    PREFIX=$NODE_ENV $NODE_SCRIPT -y
+    PATH="$NODE_ENV/bin:$PATH"
     npm install -g neovim
 fi
 
 # Setup tmux
-if [[ ! -d $XDG_CONFIG_HOME/tmux/plugins/tpm ]]; then
+if [[ ! -d $XDG_CONFIG_HOME/tmux/plugins/ ]]; then
     mkdir -p $XDG_CONFIG_HOME/tmux/plugins
-    git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm
-    ~/.config/tmux/plugins/tpm/scripts/install_plugins.sh &&
-	cd ~/.config/tmux/plugins/tmux-thumbs &&
+    git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm &&
+        ~/.config/tmux/plugins/tpm/scripts/install_plugins.sh &&
+        cd ~/.config/tmux/plugins/tmux-thumbs &&
 		expect -c "spawn ./tmux-thumbs-install.sh; send \"\r2\r\"; expect complete" 1>/dev/null
 fi
 
-
 # Setup zsh
-# Need an alternative where exec zsh is added to .bashrc
+# also need an alternative where exec zsh is added to .bashrc
 chsh -s $(which zsh)
 
 exit 0
