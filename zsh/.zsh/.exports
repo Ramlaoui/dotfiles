@@ -8,10 +8,10 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export NPM_CONFIG_PREFIX="$XDG_DATA_HOME/node"
 
 # Set PATH
-export PATH="$HOME/.local/bin:$XDG_NPM_CONFIG_PREFIX/bin:$PATH"
+export PATH="$HOME/.local/bin:$XDG_DATA_HOME/node/bin:$PATH"
 
 # Set ZDOTDIR to the default zsh config location
-[[ -d $XDG_CONFIG_HOME/zsh ]] && export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+[[ -d $HOME/.zsh ]] && export ZDOTDIR="$HOME/.zsh"
 
 # neovim as default editor
 export EDITOR=nvim

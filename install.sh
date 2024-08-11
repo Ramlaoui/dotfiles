@@ -12,7 +12,7 @@ stow zsh \
 
 XDG_CONFIG_HOME=$HOME/.config
 XDG_DATA_HOME=$HOME/.local/share
-ZSH_HOME=$XDG_CONFIG_HOME/zsh
+ZSH_HOME=$HOME/.zsh
     
 # prezto
 if [[ ! -d $ZSH_HOME/.zprezto ]]; then
@@ -26,7 +26,7 @@ else
     echo "Installing Starship..."
     echo "Attempting to install Starship in /usr/bin..."
 
-    if curl -sS https://starship.rs/install.sh | yes | sh -s; then
+    if curl -sS https://starship.rs/install.sh | sh -s -- --yes; then
         echo "Starship installed successfully in /usr/bin."
     else
         echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
@@ -76,14 +76,14 @@ if [[ ! -d $NODE_ENV ]]; then
     mkdir -p $NODE_ENV
     NODE_SCRIPT=$NODE_ENV/install-node.sh
     if command -v curl > /dev/null; then
-        $DOWNLOAD_CMD="curl -sL install-node.now.sh/lts -o $NODE_SCRIPT"
+        curl -sL install-node.now.sh/lts -o $NODE_SCRIPT
     else
         echo "ERROR: curl is not installed"
         exit 1
     fi
     chmod +x $NODE_SCRIPT
-    PREFIX=$NODE_ENV $NODE_SCRIPT -y
-    PATH="$NODE_ENV/bin:$PATH"
+    PREFIX=$NODE_ENV $NODE_SCRIPT -y # install node in $NODE_ENV
+    export PATH=$NODE_ENV/bin:$PATH
     npm install -g neovim
 fi
 
