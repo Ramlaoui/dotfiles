@@ -15,9 +15,9 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 0
 else
     echo "Installing tmux plugins..."
-    rm -rf $XDG_CONFIG_HOME/tmux
-    mkdir -p $XDG_CONFIG_HOME/tmux/plugins
-    git clone --depth=1 https://github.com/tmux-plugins/tpm $TMUX_PLUGIN_MANAGER_PATH
+    rm -rf $HOME/.config/tmux/plugins
+    mkdir -p $HOME/.config/tmux/plugins
+    git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm
 fi
 
 stow zsh \
@@ -81,7 +81,7 @@ fi
     $PIP install --upgrade pip
     $PIP install neovim
     $PIP install 'python-language-server[all]'
-    $PIP install pylint isort jedi flake8
+    $PIP install pylint isort jedi flake8 pyright
     $PIP install black yapf
 
 # Create node env
@@ -101,6 +101,10 @@ if [[ ! -d $NODE_ENV ]]; then
     npm install -g neovim
 fi
 
+# Finish setting up tmux
+tmux source-file $HOME/.config/tmux/tmux.conf
+chmod +x $HOME/.config/tmux/plugins/tpm/scripts/install_plugins.sh
+$HOME/.config/tmux/plugins/tpm/scripts/install_plugins.sh
 
 # Setup zsh
 # also need an alternative where exec zsh is added to .bashrc
