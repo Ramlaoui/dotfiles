@@ -1,5 +1,5 @@
 ZSH_DIR=$HOME/.config/zsh
-ZDOTDIR=$HOME/.config/zsh
+ZDOTDIR=$HOME # The only way to change this from the default is to set it in the environment before starting zsh (.zshenv)...
 
 [[ $- != *i* ]] && return # if not interactive shell, return
 
