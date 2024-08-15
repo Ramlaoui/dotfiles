@@ -5,7 +5,6 @@
 # fzf
 alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid --line-range :500 {}'"
 
-
 # General
 
 # Find + manage aliases
@@ -24,10 +23,20 @@ alias ff='find . -type f -name' # Find a file by name within current directory
 (( $+commands[fd] )) || alias fd='find . -type d -name' # Find direcroy by name
 
 # External Services
-alias myip='curl icanhazip.com'
+alias myip='curl ipv4.icanhazip.com'
 
 # dotfiles
 alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
+
+# orgmode
+# alias notes="nvim ~/orgfiles/refile.org"
+# fzf to search notes
+#
+
+
+# Git
+alias lg="lazygit"
+
 
 # Tmux shortcuts
 alias tmux='tmux -u'
