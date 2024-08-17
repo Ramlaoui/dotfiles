@@ -50,7 +50,7 @@ return {
 			-- sources for autocompletion
 			sources = cmp.config.sources({
 				{ name = "nvim_lsp" },
-				-- 	{ name = "luasnip" }, -- snippets
+				-- { name = "luasnip" }, -- snippets
 				{ name = "ultisnips" }, -- ultisnips
 				{ name = "buffer" }, -- text within current buffer
 				{ name = "path" }, -- file system paths
