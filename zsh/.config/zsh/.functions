@@ -2,3 +2,36 @@
 
 ## add functions
 
+function ssh_server() {
+    local server_name=$1
+    local server_ip=$2
+    local server_user=$3
+    local server_port=$4
+    local server_key=$5
+
+    # Print Usage:
+    if [ -z "$server_name" ] || [ -z "$server_ip" ] || [ -z "$server_user" ]; then
+        echo "Usage: add_ssh_server_to_config <server_name> <server_ip> <server_user> [server_port] [server_key]"
+        return 1
+    fi
+
+    if [ -z "$server_port" ]; then
+        server_port=22
+    fi
+
+    if [ -z "$server_key" ]; then
+        server_key=~/.ssh/id_rsa
+    fi
+
+
+    echo "" >> ~/.ssh/config
+    echo "Host $server_name" >> ~/.ssh/config
+    echo "    HostName $server_ip" >> ~/.ssh/config
+    echo "    Port $server_port" >> ~/.ssh/config
+    echo "    User $server_user" >> ~/.ssh/config
+    echo "    ForwardAgent yes" >> ~/.ssh/config
+    echo "    IdentityFile $server_key" >> ~/.ssh/config
+
+    sscopy $server_name
+}
+    

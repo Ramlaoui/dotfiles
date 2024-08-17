@@ -33,6 +33,12 @@ alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 # fzf to search notes
 #
 
+# SSH
+alias ssconfig="nvim ~/.ssh/config"
+alias sskeys="cd ~/.ssh && ls -l"
+alias ssgen="ssh-keygen -t rsa -b 4096 -C"
+alias sscopy="ssh-copy-id"
+alias ssadd="ssh-add"
 
 # Git
 alias lg="lazygit"
