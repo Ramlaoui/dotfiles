@@ -8,3 +8,5 @@ vim.cmd([[
 ]])
 
 vim.g.python3_host_prog = "$XDG_DATA_HOME/nvim/py3/bin/python3"
+-- node host
+vim.g.node_host_prog = "$XDG_DATA_HOME/node/bin/node"
