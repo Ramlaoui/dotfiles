@@ -5,6 +5,9 @@
 # fzf
 alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid --line-range :500 {}'"
 
+# inkscape watch
+alias inkscape-watch="inkscape-figures watch"
+
 # General
 
 # Find + manage aliases
