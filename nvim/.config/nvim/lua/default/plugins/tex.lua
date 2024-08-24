@@ -1,38 +1,42 @@
 return {
 	"lervag/vimtex",
-	event = { "BufReadPre", "BufNewFile" },
+	-- event = { "BufReadPre", "BufNewFile" },
 	config = function()
 		-- PDF Viewer:
 		-- http://manpages.ubuntu.com/manpages/trusty/man5/zathurarc.5.html
-		vim.g["vimtex_view_method"] = "sioyek"
-		vim.g["vimtex_quickfix_mode"] = 0
+		vim.g.vimtex_view_method = "sioyek"
+		vim.g.vimtex_quickfix_mode = 0
+		-- for synctex, install xdotool
 
-		-- Ignore mappings
-		vim.g["vimtex_mappings_enabled"] = 0
-
-		-- Auto Indent
-		vim.g["vimtex_indent_enabled"] = 0
-
-		-- Syntax highlighting
-		vim.g["vimtex_syntax_enabled"] = 1
+		vim.g.vimtex_mappings_enabled = 1
 
 		-- Error suppression:
 		-- https://github.com/lervag/vimtex/blob/master/doc/vimtex.txt
 
-		vim.g["vimtex_log_ignore"] = {
-			"Underfull",
-			"Overfull",
-			"specifier changed to",
-			"Token not allowed in a PDF string",
-		}
+		-- vim.g["vimtex_log_ignore"] = {
+		-- 	"Underfull",
+		-- 	"Overfull",
+		-- 	"specifier changed to",
+		-- 	"Token not allowed in a PDF string",
+		-- }
 
-		vim.g["vimtex_context_pdf_viewer"] = "okular"
+		vim.g["vimtex_context_pdf_viewer"] = "sioyek"
+
+		vim.g.vimtex_compiler_latexmk = {
+			options = {
+				"-verbose",
+				"-file-line-error",
+				"-synctex=1",
+				"-interaction=nonstopmode",
+				"-shell-escape",
+				-- "-outdir=build",
+			},
+		}
 
 		-- vim.g['vimtex_complete_enabled'] = 1
 		-- vim.g['vimtex_compiler_progname'] = 'nvr'
 		-- vim.g['vimtex_complete_close_braces'] = 1
 		--
-		local keymap = vim.keymap -- for conciseness
 
 		vim.api.nvim_set_keymap(
 			"i",
@@ -48,6 +52,6 @@ return {
 			{ noremap = true }
 		)
 
-		keymap.set("n", "<leader>ll", "<plug>(vimtex-compile)", { desc = "Toggle compile of .tex file" }) -- toggle file explorer
+		-- keymap.set("n", "<leader>ll", "<plug>(vimtex-compile)", { desc = "Toggle compile of .tex file" }) -- toggle file explorer
 	end,
 }
