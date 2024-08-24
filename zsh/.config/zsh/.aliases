@@ -29,7 +29,7 @@ alias myip='curl ipv4.icanhazip.com'
 alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 
 # orgmode
-# alias notes="nvim ~/orgfiles/refile.org"
+alias notes="nvim ~/org/refile.org"
 # fzf to search notes
 #
 
