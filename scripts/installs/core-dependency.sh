@@ -8,10 +8,11 @@ core_packages=(
     "git" # Manage dependencies and dotfiles
     "python3-venv" # Python virtual environments
     "curl" # Download files
-    "nvim" # Text editor
+    "neovim" # Text editor
     "zsh" # Shell
     "htop" # System monitor
     "fzf" # Fuzzy finder
+    "tmux" # Terminal multiplexer
     "stow" # Dotfile manager (symlinks)
 )
 
@@ -32,15 +33,18 @@ function print_usage () {
 
 function install_debian () {
   echo -e "${PURPLE}Installing ${1} via apt-get${RESET}"
-  sudo apt install $1
+  sudo apt install $1 -y
+  sudo apt upgrade $1 -y
 }
 function install_arch () {
   echo -e "${PURPLE}Installing ${1} via Pacman${RESET}"
-  sudo pacman -S $1
+  sudo pacman -S $1 --noconfirm
+  sudo pacman -Syu $1 --noconfirm
 }
 function install_mac () {
   echo -e "${PURPLE}Installing ${1} via Homebrew${RESET}"
-  brew install $1
+  brew install $1 -y
+  brew upgrade $1 -y
 }
 function get_homebrew () {
   echo -e "${PURPLE}Setting up Homebrew${RESET}"
