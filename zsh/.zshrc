@@ -34,14 +34,14 @@ zle -N zle-keymap-select
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
-__conda_setup="$('/opt/homebrew/Caskroom/miniconda/base/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
+__conda_setup="$('/home/ramlaouiali/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
 if [ $? -eq 0 ]; then
     eval "$__conda_setup"
 else
-    if [ -f "/opt/homebrew/Caskroom/miniconda/base/etc/profile.d/conda.sh" ]; then
-        . "/opt/homebrew/Caskroom/miniconda/base/etc/profile.d/conda.sh"
+    if [ -f "/home/ramlaouiali/miniconda3/etc/profile.d/conda.sh" ]; then
+        . "/home/ramlaouiali/miniconda3/etc/profile.d/conda.sh"
     else
-        export PATH="/opt/homebrew/Caskroom/miniconda/base/bin:$PATH"
+        export PATH="/home/ramlaouiali/miniconda3/bin:$PATH"
     fi
 fi
 unset __conda_setup
@@ -53,3 +53,5 @@ if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '
 # The next line enables shell command completion for gcloud.
 if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 
+export PATH=$XDG_DATA_HOME/node/bin:$PATH
+export PATH="/home/ramlaouiali/usr/local/bin:$PATH"

@@ -108,6 +108,7 @@ if [[ ! -d $NODE_ENV ]]; then
     PREFIX=$NODE_ENV $NODE_SCRIPT -y # install node in $NODE_ENV
     export PATH=$NODE_ENV/bin:$PATH
     npm install -g neovim
+    npm install -g tree-sitter-cli
 fi
 
 # Finish setting up tmux
