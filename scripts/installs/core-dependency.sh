@@ -11,7 +11,7 @@ core_packages=(
     "nvim" # Text editor
     "zsh" # Shell
     "htop" # System monitor
-    # "fzf" # Fuzzy finder
+    "fzf" # Fuzzy finder
     "stow" # Dotfile manager (symlinks)
 )
 
@@ -54,9 +54,9 @@ function multi_system_install () {
   if [ "$(uname -s)" = "Darwin" ]; then
     if ! hash brew 2> /dev/null; then get_homebrew; fi
     install_mac $app # MacOS via Homebrew
-  elif [ -f "/etc/arch-release" ] && hash pacman 2> /dev/null; then 
+elif [ "$(uname -s)" = "Linux" ] && hash pacman 2> /dev/null; then
     install_arch $app # Arch Linux via Pacman
-  elif ! [ -f "/etc/debian_version" ] && hash apt 2> /dev/null; then
+elif [ "$(uname -s)" = "Linux" ] && hash apt 2> /dev/null; then
     install_debian $app # Debian via apt-get
   else
     echo -e "${YELLOW}Skipping ${app}, as couldn't detect system type ${RESET}"
@@ -96,6 +96,7 @@ then
     
     git clone https://github.com/tmux/tmux.git $HOME/.local/src/tmux
     cd $HOME/.local/src/tmux
+    # requires autotools-dev and automake and clang
     sh autogen.sh
     ./configure && make && make install
 
@@ -131,7 +132,7 @@ fi
 
 
 # check if fzf is available
-if ! command -v fzf &> /dev/null; then
+if [! command -v fzf &> /dev/null]; then
     echo "fzf is not installed"
 
     echo "Installing from source"
