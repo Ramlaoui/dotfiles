@@ -32,8 +32,9 @@ return {
 				}), -- js/ts formatter
 				formatting.stylua, -- lua formatter
 				formatting.isort,
-				formatting.black,
-				diagnostics.pylint,
+				formatting.black.with({
+					extra_args = { "--line-length", "127" },
+				}),
 				require("none-ls.diagnostics.eslint_d"),
 			},
 			-- configure format on save
@@ -45,10 +46,6 @@ return {
 						buffer = bufnr,
 						callback = function()
 							vim.lsp.buf.format({
-								filter = function(client)
-									--  only use null-ls for formatting instead of lsp server
-									return client.name == "null-ls"
-								end,
 								bufnr = bufnr,
 							})
 						end,

@@ -48,8 +48,27 @@ return {
 				"stylua", -- lua formatter
 				"isort", -- python formatter
 				"black", -- python formatter
-				"pylint", -- python linter
+				"ruff-lsp", -- python linter
+				"mypy", -- python linter
 				"eslint_d", -- js linter
+			},
+		})
+
+		vim.diagnostic.config({
+			underline = true,
+			update_in_insert = false,
+			virtual_text = {
+				spacing = 4,
+				source = "if_many",
+			},
+			severity_sort = true,
+			float = {
+				focusable = true,
+				style = "minimal",
+				border = "rounded",
+				source = "always",
+				header = "",
+				prefix = "",
 			},
 		})
 	end,
