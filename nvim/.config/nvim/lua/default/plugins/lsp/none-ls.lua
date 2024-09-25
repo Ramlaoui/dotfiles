@@ -32,9 +32,9 @@ return {
 				}), -- js/ts formatter
 				formatting.stylua, -- lua formatter
 				formatting.isort,
-				formatting.black.with({
-					extra_args = { "--line-length", "127" },
-				}),
+				-- formatting.black.with({
+				-- 	extra_args = { "--line-length", "127" },
+				-- }),
 				require("none-ls.diagnostics.eslint_d"),
 			},
 			-- configure format on save
