@@ -141,8 +141,8 @@ return {
 			on_attach = on_attach,
 			init_options = {
 				settings = {
-					-- args = { "--config=~/.config/python/pyproject.toml" },
-					args = {}, -- Later set a default config that can be overridden
+					args = { "--config=~/.config/python/pyproject.toml" },
+					-- args = { "--line-length=127" }, -- Later set a default config that can be overridden
 				},
 			},
 		})
@@ -163,23 +163,23 @@ return {
 		})
 
 		-- -- configure python server
-		lspconfig["pyright"].setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-			log_level = "debug",
-			settings = {
-				pyright = {
-					disableOrganizeImports = true, -- Using Ruff
-				},
-				python = {
-					analysis = {
-						ignore = { "*" }, -- Using Ruff
-						typeCheckingMode = "off", -- Using mypy
-						diagnosticMode = "openFilesonly",
-					},
-				},
-			},
-		})
+		-- lspconfig["pyright"].setup({
+		-- 	capabilities = capabilities,
+		-- 	on_attach = on_attach,
+		-- 	log_level = "debug",
+		-- 	settings = {
+		-- 		pyright = {
+		-- 			disableOrganizeImports = true, -- Using Ruff
+		-- 		},
+		-- 		python = {
+		-- 			analysis = {
+		-- 				ignore = { "*" }, -- Using Ruff
+		-- 				typeCheckingMode = "off", -- Using mypy
+		-- 				diagnosticMode = "openFilesonly",
+		-- 			},
+		-- 		},
+		-- 	},
+		-- })
 
 		-- configure lua server (with special settings)
 		lspconfig["lua_ls"].setup({
