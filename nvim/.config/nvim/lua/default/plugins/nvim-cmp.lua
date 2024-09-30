@@ -4,28 +4,26 @@ return {
 	dependencies = {
 		"hrsh7th/cmp-buffer", -- source for text in buffer
 		"hrsh7th/cmp-path", -- source for file system paths
-		-- 	"L3MON4D3/LuaSnip", -- snippet engine
-		-- "saadparwaiz1/cmp_luasnip", -- for autocompletion
+		"L3MON4D3/LuaSnip", -- snippet engine
+		"saadparwaiz1/cmp_luasnip", -- for autocompletion
 		"rafamadriz/friendly-snippets", -- useful snippets
 		"onsails/lspkind.nvim", -- vs-code like pictograms
 		"SirVer/ultisnips", -- ultisnips
 		"quangnguyen30192/cmp-nvim-ultisnips", -- ultisnips support
 		"kdheepak/cmp-latex-symbols", -- latex symbols
-		-- "micangl/cmp-vimtex", -- vimtex completion
+		"micangl/cmp-vimtex", -- vimtex completion
 	},
 	config = function()
-		-- require("luasnip.loaders.from_lua").load({ paths = "~/.snippets" })
-
 		local cmp = require("cmp")
 
-		-- local luasnip = require("luasnip")
+		local luasnip = require("luasnip")
 
 		local lspkind = require("lspkind")
 
 		require("cmp_nvim_ultisnips.mappings")
 
-		-- loads vscode style snippets from installed plugins (e.g. friendly-snippets)
-		require("luasnip.loaders.from_vscode").lazy_load()
+		-- -- loads vscode style snippets from installed plugins (e.g. friendly-snippets)
+		-- require("luasnip.loaders.from_vscode").lazy_load()
 
 		cmp.setup({
 			completion = {
@@ -54,7 +52,7 @@ return {
 				{ name = "ultisnips" }, -- ultisnips
 				{ name = "buffer" }, -- text within current buffer
 				{ name = "path" }, -- file system paths
-				{ name = "latex_symbols" }, -- latex symbols
+				{ name = "ltex_symbols" }, -- latex symbols
 				{ name = "vimtex" }, -- vimtex completion
 				{ name = "orgmode" }, -- orgmode completion
 			}),
@@ -64,6 +62,10 @@ return {
 					maxwidth = 50,
 					ellipsis_char = "...",
 				}),
+			},
+			window = {
+				completion = cmp.config.window.bordered(),
+				documentation = cmp.config.window.bordered(),
 			},
 		})
 	end,
