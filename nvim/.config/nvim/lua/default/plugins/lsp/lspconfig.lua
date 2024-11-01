@@ -141,7 +141,7 @@ return {
 			on_attach = on_attach,
 			init_options = {
 				settings = {
-					args = { "--config=~/.config/python/pyproject.toml" },
+					-- args = { "--config=~/.config/python/pyproject.toml" },
 					-- args = { "--line-length=127" }, -- Later set a default config that can be overridden
 				},
 			},
