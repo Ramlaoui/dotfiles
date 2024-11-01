@@ -9,6 +9,7 @@ core_packages=(
     "python3-venv" # Python virtual environments
     "curl" # Download files
     "neovim" # Text editor
+    "fd-find" # Find files
     "zsh" # Shell
     "htop" # System monitor
     "fzf" # Fuzzy finder

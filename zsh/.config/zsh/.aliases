@@ -55,143 +55,22 @@ alias tn='tmux new-session -s'
 alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
 
-# Tmux helpers
-function tsplit() {
-  tmux split-window -v "$@"
-}
-
-function tvsplit() {
-  tmux split-window -h "$@"
-}
-
-function tresize() {
-  tmux resize-pane -D "$@"
-}
-
-function tresizeh() {
-  tmux resize-pane -R "$@"
-}
-
-function tresizev() {
-  tmux resize-pane -U "$@"
-}
-
-function tresizeleft() {
-  tmux resize-pane -L "$@"
-}
-
-function tresizeup() {
-  tmux resize-pane -U "$@"
-}
-
-function tresizedown() {
-  tmux resize-pane -D "$@"
-}
-
-function tresizeup() {
-  tmux resize-pane -U "$@"
-}
-
-function tresizeleft() {
-  tmux resize-pane -L "$@"
-}
-
-function tresizeright() {
-  tmux resize-pane -R "$@"
-}
+# iCloud Drive
+export DRIVE="~/Library/Mobile\ Documents/com~apple~CloudDocs"
+alias icloud="cd $DRIVE"
+alias stage="cd $DRIVE/stage"
+alias phd="cd $DRIVE/phd"
+alias admin="cd $DRIVE/admin"
+alias me="cd $DRIVE/me"
+alias me="cd $DRIVE/fun"
 
 # Perso
-
 copy_pwd() {
     pwd | pbcopy
 }
 
-alias stage="cd /Users/aliramlaoui/Google\ Drive/My\ Drive/stage/"
-
-export DRIVE="/Users/aliramlaoui/Google Drive/My Drive/"
-export COURS="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A"
-cours() {
-    cd /Users/aliramlaoui/Google\ Drive/My\ Drive/Cours\ 3A
-}
-
-fun() {
-    cd /Users/aliramlaoui/Google\ Drive/My\ Drive/fun
-}
-
-ritz() {
-    cd "$DRIVE"ritz
-}
-
-function latexnote() {
-    if [[ $# -eq 0 ]]; then
-        echo "Please provide a directory name as an argument."
-        return 1
-    fi
-
-    local dest_dir="$1"
-    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_template/"
-
-    # Check if the destination directory exists, create it if it doesn't
-    if [[ ! -d "$dest_dir" ]]; then
-        mkdir -p "$dest_dir"
-    fi
-
-    # Copy the latex_template folder to the destination directory
-    cp -r "$template_dir" "$dest_dir"
-
-    echo "latex_template folder copied to $dest_dir successfully."
-}
-
-function latexbeamer() {
-    if [[ $# -eq 0 ]]; then
-        echo "Please provide a directory name as an argument."
-        return 1
-    fi
-
-    local dest_dir="$1"
-    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_beamer/"
-
-    # Check if the destination directory exists, create it if it doesn't
-    if [[ ! -d "$dest_dir" ]]; then
-        mkdir -p "$dest_dir"
-    fi
-
-    # Copy the latex_template folder to the destination directory
-    cp -r "$template_dir" "$dest_dir"
-
-    echo "latex_template folder copied to $dest_dir successfully."
-}
-
-function latexcs() {
-    if [[ $# -eq 0 ]]; then
-        echo "Please provide a directory name as an argument."
-        return 1
-    fi
-
-    local dest_dir="$1"
-    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_cs/"
-
-    # Check if the destination directory exists, create it if it doesn't
-    if [[ ! -d "$dest_dir" ]]; then
-        mkdir -p "$dest_dir"
-    fi
-
-    # Copy the latex_template folder to the destination directory
-    cp -r "$template_dir" "$dest_dir"
-
-    echo "latex_template folder copied to $dest_dir successfully."
-}
-
 editrc() {
     nvim ~/.zshrc
-}
-
-vault() {
-    cd /Users/aliramlaoui/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/Obsidian\ Vault
-}
-
-vaultcourse() {
-    cd /Users/aliramlaoui/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/Obsidian\ Vault/CSMVA
 }
 
 latexsnippets() {
@@ -205,5 +84,3 @@ nvimconfig() {
 tmuxconfig() {
     nvim ~/.config/tmux/.tmux.conf
 }
-
-export EDITOR=nvim

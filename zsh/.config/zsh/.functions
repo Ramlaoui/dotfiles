@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-## add functions
-
+# SSH Functions
 function ssh_server() {
     local server_name=$1
     local server_ip=$2
@@ -35,3 +34,109 @@ function ssh_server() {
     sscopy $server_name
 }
     
+# Latex functions
+function latexnote() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_template/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+function latexbeamer() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_beamer/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+function latexcs() {
+    if [[ $# -eq 0 ]]; then
+        echo "Please provide a directory name as an argument."
+        return 1
+    fi
+
+    local dest_dir="$1"
+    local template_dir="/Users/aliramlaoui/Google Drive/My Drive/Cours 3A/latex/latex_cs/"
+
+    # Check if the destination directory exists, create it if it doesn't
+    if [[ ! -d "$dest_dir" ]]; then
+        mkdir -p "$dest_dir"
+    fi
+
+    # Copy the latex_template folder to the destination directory
+    cp -r "$template_dir" "$dest_dir"
+
+    echo "latex_template folder copied to $dest_dir successfully."
+}
+
+# Tmux helpers
+function tsplit() {
+  tmux split-window -v "$@"
+}
+
+function tvsplit() {
+  tmux split-window -h "$@"
+}
+
+function tresize() {
+  tmux resize-pane -D "$@"
+}
+
+function tresizeh() {
+  tmux resize-pane -R "$@"
+}
+
+function tresizev() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizeleft() {
+  tmux resize-pane -L "$@"
+}
+
+function tresizeup() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizedown() {
+  tmux resize-pane -D "$@"
+}
+
+function tresizeup() {
+  tmux resize-pane -U "$@"
+}
+
+function tresizeleft() {
+  tmux resize-pane -L "$@"
+}
+
+function tresizeright() {
+  tmux resize-pane -R "$@"
+}
+
