@@ -6,10 +6,12 @@
 
 core_packages=(
     "git" # Manage dependencies and dotfiles
-    "python3-venv" # Python virtual environments
     "curl" # Download files
+    "python3-venv" # Python virtual environments
     "neovim" # Text editor
     "fd-find" # Find files
+    "git-delta" # Git diff viewer
+    "bat" # Cat clone with syntax highlighting
     "zsh" # Shell
     "htop" # System monitor
     "fzf" # Fuzzy finder

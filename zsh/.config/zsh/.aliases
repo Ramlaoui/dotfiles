@@ -25,6 +25,9 @@ alias duf='du -sh *' # List total size of current directory
 alias ff='find . -type f -name' # Find a file by name within current directory
 (( $+commands[fd] )) || alias fd='find . -type d -name' # Find direcroy by name
 
+# Displaying files
+alias cat='bat' # Use bat instead of cat
+
 # External Services
 alias myip='curl ipv4.icanhazip.com'
 
