@@ -4,26 +4,54 @@
 
 set -e
 
-PARAMS=$*
 DOTFILES_DIR="${DOTFILES_DIR:-${SRC_DIR:-$HOME/dotfiles}}"
 
-# install stow, make, cmake, gettext
-# # download and install zimfw (modules will be loaded from .zimrc)
+# Parse command-line arguments
+STOW_ONLY=false
+
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --stow-only)
+            STOW_ONLY=true
+            shift # past argument
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--stow-only]"
+            echo "  --stow-only     Only apply 'stow' to the folder, skip dependencies installation."
+            exit 0
+            ;;
+        *)    # unknown option
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$STOW_ONLY" = true ]; then
+    echo "Running stow only, skipping dependencies installation."
+    stow zsh \
+        tmux \
+        nvim
+    exit 0
+fi
+
+# Install core dependencies
 ./scripts/installs/core-dependency.sh
 
 # Setup tmux
-# ask for confirmation
 read -p "Do you want to install tmux plugins? This will remove the current tmux configuration [y/n] " -n 1 -r
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Skipping tmux plugin installation"
-else
+if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "Installing tmux plugins..."
     rm -rf $HOME/.config/tmux/plugins
     mkdir -p $HOME/.config/tmux/plugins
     git clone --depth=1 https://github.com/tmux-plugins/tpm $HOME/.config/tmux/plugins/tpm
+else
+    echo "Skipping tmux plugin installation"
 fi
 
+# Apply stow to the folders
 stow zsh \
     tmux \
     nvim
@@ -31,8 +59,8 @@ stow zsh \
 XDG_CONFIG_HOME=$HOME/.config
 XDG_DATA_HOME=$HOME/.local/share
 ZSH_HOME=$HOME/.zsh
-    
-# starship
+
+# Install Starship prompt
 if command -v starship > /dev/null; then
     echo "Starship is already installed"
 else
@@ -43,7 +71,6 @@ else
         echo "Starship installed successfully in /usr/bin."
     else
         echo "Installation in /usr/bin failed. Trying to install in ~/.local/bin..."
-        # If the installation to /usr/bin fails, try installing to ~/.local/bin
         if curl -sS https://starship.rs/install.sh | sh -s -- --bin-dir ~/.local/bin --yes; then
             echo "Starship installed successfully in ~/.local/bin."
             echo 'Make sure ~/.local/bin is in your PATH.'
@@ -54,21 +81,17 @@ else
     fi
 fi
 
-# prezto
+# Install Prezto
 if [[ -d ${ZDOTDIR:-$HOME}/.zprezto ]]; then
     echo "Prezto is already installed"
 else
     git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
-    # # add prompt_starship_setup function to Prezto (was unable to make it work), load starship in .zshrc after prezto
-    # ZPREZTODIR=${ZPREZTODIR:-${ZDOTDIR:-$HOME}/.zprezto}
-    # echo 'eval "$(starship init zsh)"' >! $ZPREZTODIR/modules/prompt/functions/prompt_starship_setup
 fi
 
-# Setup nvim
+# Setup Neovim
 NVIM=$HOME/.local/
 mkdir -p $NVIM
 
-# AppImage in case the computer does not have a fallback nvim (appimage does not self update)
 if command -v nvim > /dev/null; then
     echo "NVIM appears to be installed"
 else
@@ -80,8 +103,7 @@ else
     cd -
 fi
 
-
-# Create separate Python3 environment for neovim
+# Create Python3 environment for Neovim
 NVIM_VENVS=$XDG_DATA_HOME/nvim
 if [[ ! -d $NVIM_VENVS/py3 ]]; then
     python3 -m venv $NVIM_VENVS/py3
@@ -93,7 +115,7 @@ if [[ ! -d $NVIM_VENVS/py3 ]]; then
     $PIP install black yapf
 fi
 
-# Create node env
+# Create Node.js environment
 NODE_ENV=$XDG_DATA_HOME/node
 if [[ ! -d $NODE_ENV ]]; then
     mkdir -p $NODE_ENV
@@ -105,20 +127,18 @@ if [[ ! -d $NODE_ENV ]]; then
         exit 1
     fi
     chmod +x $NODE_SCRIPT
-    PREFIX=$NODE_ENV $NODE_SCRIPT -y # install node in $NODE_ENV
+    PREFIX=$NODE_ENV $NODE_SCRIPT -y
     export PATH=$NODE_ENV/bin:$PATH
     npm install -g neovim
     npm install -g tree-sitter-cli
 fi
 
-# Finish setting up tmux
+# Finalize tmux setup
 tmux source-file $HOME/.config/tmux/tmux.conf
 chmod +x $HOME/.config/tmux/plugins/tpm/scripts/install_plugins.sh
 $HOME/.config/tmux/plugins/tpm/scripts/install_plugins.sh
 
-# Setup zsh
-# also need an alternative where exec zsh is added to .bashrc
+# Set default shell to zsh
 chsh -s $(which zsh)
 
 exit 0
-
