@@ -8,6 +8,7 @@
 [core]
     editor = nvim
     excludesfile = ~/.config/git/.gitignore_global
+    pager = delta
 [push]
     default = simple
 [merge]
@@ -25,19 +26,9 @@
 	defaultBranch = main
 [color]
     ui = auto
-[diff]
-    tool = nvimdiff 
-    [color "diff-highlight"]
-    oldNormal = red bold
-    oldHighlight = red bold 52
-    newNormal = green bold
-    newHighlight = green bold 22
-[color "diff"]
-    meta = 11
-    frag = magenta bold
-    commit = yellow bold
-    old = red bold
-    new = green bold
-    whitespace = red reverse
-[difftool "nvimdiff"]
-    cmd = "nvim -d \"$LOCAL\" \"$REMOTE\""
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true    # use n and N to move between diff sections
+[merge]
+    conflictstyle = zdiff3
