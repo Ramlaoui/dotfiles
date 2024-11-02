@@ -12,6 +12,8 @@ core_packages=(
     "fd-find" # Find files
     "git-delta" # Git diff viewer
     "bat" # Cat clone with syntax highlighting
+    "eza" # Better ls
+    "tldr" # Simplified man
     "zsh" # Shell
     "htop" # System monitor
     "fzf" # Fuzzy finder
