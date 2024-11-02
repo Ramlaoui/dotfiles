@@ -26,7 +26,8 @@ alias ff='find . -type f -name' # Find a file by name within current directory
 (( $+commands[fd] )) || alias fd='find . -type d -name' # Find direcroy by name
 
 # Displaying files
-alias cat='bat' # Use bat instead of cat
+(( $+commands[bat] )) && alias cat='bat' # Use bat instead of cat
+(( $+commands[eza] )) && alias ls='eza' # Use exa instead of ls
 
 # External Services
 alias myip='curl ipv4.icanhazip.com'
@@ -37,7 +38,6 @@ alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 # orgmode
 alias notes="nvim ~/org/refile.org"
 # fzf to search notes
-#
 
 # SSH
 alias ssconfig="nvim ~/.ssh/config"
