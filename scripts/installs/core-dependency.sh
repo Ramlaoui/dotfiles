@@ -21,6 +21,22 @@ core_packages=(
     "stow" # Dotfile manager (symlinks)
 )
 
+# List of packages with their repository URLs and build types
+declare -a git_packages=(
+  "git git https://github.com/git/git make"
+  "curl curl https://github.com/curl/curl autotools"
+  # "python3-venv https://github.com/python/cpython autotools"
+  "neovim https://github.com/neovim/neovim cmake"
+  "fd-find fd https://github.com/sharkdp/fd rust"
+  "git-delta delta https://github.com/dandavison/delta rust"
+  "bat bat https://github.com/sharkdp/bat rust"
+  "zsh zsh https://github.com/zsh-users/zsh autotools"
+  "htop htop https://github.com/htop-dev/htop autotools"
+  "fzf fzf https://github.com/junegunn/fzf go"
+  "tmux tmux https://github.com/tmux/tmux autotools"
+  "stow stow https://github.com/aspiers/stow stow"
+)
+
 # Color variables
 PURPLE='\033[0;35m'
 YELLOW='\033[0;93m'
@@ -72,6 +88,104 @@ elif [ "$(uname -s)" = "Linux" ] && hash apt 2> /dev/null; then
   fi
 }
 
+# Function to install packages from Git repositories
+function install_from_git () {
+  local package_name="$1"
+  local repo_url="$2"
+  local build_type="$3"
+  
+  echo -e "${PURPLE}Installing ${package_name} from Git${RESET}"
+  
+  local repo_name=$(basename "$repo_url" .git)
+  
+  echo -e "${PURPLE}Cloning ${repo_url}${RESET}"
+  git clone "$repo_url"
+  
+  cd "$repo_name" || exit 1
+  
+  echo -e "${PURPLE}Building and installing ${package_name}${RESET}"
+  
+  case "$build_type" in
+    autotools)
+      ./configure --prefix="$HOME/.local"
+      make
+      make install
+      ;;
+    cmake)
+      cmake . -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+      make
+      make install
+      ;;
+    rust)
+      if ! hash "cargo" 2> /dev/null; then
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+        export PATH="$HOME/.cargo/bin:$PATH"
+      else
+          echo -e "rust already installed"
+      fi
+      cargo install --path . --root "$HOME/.local"
+      ;;
+    go)
+      export PATH="$HOME/go/bin:$PATH"
+      if ! hash "go" 2> /dev/null; then
+          wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz
+          mkdir -p "$HOME/go"
+          tar -C "$HOME/go" --strip-components=1 -xzf go1.23.2.linux-amd64.tar.gzb
+          rm -rf go1.23.2.linux-amd64.tar.gzb
+      else
+          echo -e "rust already installed"
+      fi
+      go build -o "$HOME/.local/bin/$package_name"
+      ;;
+    make)
+      make prefix="$HOME/.local"
+      make install prefix="$HOME/.local"
+      ;;
+    perl)
+      perl Makefile.PL PREFIX="$HOME/.local"
+      make
+      make install
+      ;;
+    stow)
+        if ! hash "cpanm" 2> /dev/null; then
+        # Download the cpanminus script
+            curl -L https://cpanmin.us -o cpanm
+            chmod +x cpanm
+
+            # Move cpanm to your local bin directory
+            mkdir -p "$HOME/.local/bin"
+            mv cpanm "$HOME/.local/bin/"
+
+            # Ensure your local bin directory is in your PATH
+            export PATH="$HOME/.local/bin:$PATH"
+        fi
+      cpanm -l "$HOME/.local" Test::Output
+      export PERL5LIB="$HOME/.local/lib/perl5:$PERL5LIB"
+    if ! hash "makeinfo" 2> /dev/null; then
+      wget https://ftp.gnu.org/gnu/texinfo/texinfo-7.1.tar.xz
+      tar xf texinfo-7.1.tar.xz
+        cd texinfo-7.1
+        ./configure --prefix="$HOME/.local" --disable-perl-xs
+        make
+    make install
+    cd ../
+    rm -rf texinfo-7.1.tar.xz
+    rm -rf texinfo-7.1
+    fi
+      autoreconf -iv
+      ./configure --prefix="$HOME/.local"
+      make
+      make install
+      ;;
+    *)
+      echo "Unknown build type: $build_type"
+      ;;
+  esac
+  
+  # cd ..
+  # rm -rf "$repo_name"
+}
+
 # Show usage instructions, help menu
 print_usage
 if [[ $* == *"--help"* ]]; then exit; fi
@@ -88,13 +202,23 @@ if [[ ! $* == *"--auto-yes"* ]] ; then
 fi
 
 # For each app, check if not present and install
-for app in ${core_packages[@]}; do
-  if ! hash "${app}" 2> /dev/null; then
-    multi_system_install $app
+# for app in ${core_packages[@]}; do
+#   if ! hash "${app}" 2> /dev/null; then
+#     multi_system_install $app
+#   else
+#     echo -e "${YELLOW}${app} is already installed, skipping${RESET}"
+#   fi
+# done
+
+for package_info in "${git_packages[@]}"; do
+  read -r package_name package_cmd repo_url build_type <<< "$package_info"
+  if ! hash "${package_cmd}" 2> /dev/null; then
+      install_from_git "$package_name" "$repo_url" "$build_type"
   else
-    echo -e "${YELLOW}${app} is already installed, skipping${RESET}"
+      echo -e "${YELLOW}${app} is already installed, skipping${RESET}"
   fi
 done
+
 
 # check if tmux is available
 if ! command -v tmux &> /dev/null
