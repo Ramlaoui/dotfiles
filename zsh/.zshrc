@@ -33,7 +33,7 @@ zle -N zle-line-init
 zle -N zle-keymap-select
 
 # Source fzf
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+(command -v fzf >/dev/null 2>&1 && source <(fzf --zsh))
 
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
 export PATH="/home/ramlaouiali/usr/local/bin:$PATH"
