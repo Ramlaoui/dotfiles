@@ -46,7 +46,8 @@ if [ "$STOW_ONLY" = true ]; then
     echo "Running stow only, skipping dependencies installation."
     stow zsh \
         tmux \
-        nvim
+        nvim \
+        git
     exit 0
 fi
 
