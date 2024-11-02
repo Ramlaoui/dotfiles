@@ -10,6 +10,40 @@ YELLOW='\033[0;93m'
 LIGHT='\x1b[2m'
 RESET='\033[0m'
 
+# Package lists
+core_packages=(
+  "git"
+  "curl"
+  "python3-venv"
+  "neovim"
+  "fd-find"
+  "git-delta"
+  "bat"
+  "eza"
+  "tldr"
+  "zsh"
+  "htop"
+  "fzf"
+  "tmux"
+  "stow"
+)
+
+declare -A git_packages
+git_packages=(
+  ["git"]="https://github.com/git/git make"
+  ["curl"]="https://github.com/curl/curl autotools"
+  ["neovim"]="https://github.com/neovim/neovim make"
+  ["fd"]="https://github.com/sharkdp/fd rust"
+  ["delta"]="https://github.com/dandavison/delta rust"
+  ["bat"]="https://github.com/sharkdp/bat rust"
+  ["zsh"]="https://github.com/zsh-users/zsh autotools"
+  ["htop"]="https://github.com/htop-dev/htop autotools"
+  ["fzf"]="https://github.com/junegunn/fzf fzf"
+  ["tmux"]="https://github.com/tmux/tmux autotools"
+  ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
+)
+
+
 # Parse command-line options
 USE_SUDO=true
 AUTO_YES=false
@@ -69,39 +103,6 @@ fi
 # Update PATH for local installations
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
 
-# Package lists
-core_packages=(
-  "git"
-  "curl"
-  "python3-venv"
-  "neovim"
-  "fd-find"
-  "git-delta"
-  "bat"
-  "eza"
-  "tldr"
-  "zsh"
-  "htop"
-  "fzf"
-  "tmux"
-  "stow"
-)
-
-declare -A git_packages
-git_packages=(
-  ["git"]="https://github.com/git/git make"
-  ["curl"]="https://github.com/curl/curl autotools"
-  ["neovim"]="https://github.com/neovim/neovim cmake"
-  ["fd"]="https://github.com/sharkdp/fd rust"
-  ["delta"]="https://github.com/dandavison/delta rust"
-  ["bat"]="https://github.com/sharkdp/bat rust"
-  ["zsh"]="https://github.com/zsh-users/zsh autotools"
-  ["htop"]="https://github.com/htop-dev/htop autotools"
-  ["fzf"]="https://github.com/junegunn/fzf go"
-  ["tmux"]="https://github.com/tmux/tmux autotools"
-  ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
-)
-
 # Installation functions
 function install_debian() {
   echo -e "${PURPLE}Installing ${1} via apt-get${RESET}"
@@ -139,6 +140,17 @@ function multi_system_install() {
     install_debian "$app"
   else
     echo -e "${YELLOW}Skipping ${app}, could not detect system type.${RESET}"
+  fi
+}
+
+function install_go() {
+    export GOPATH=$HOME
+    if ! command -v go &> /dev/null; then
+    echo -e "${PURPLE}Installing Go${RESET}"
+    GO_VERSION="1.21.1"
+    wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+    tar -C "$HOME/.local" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
+    rm "go${GO_VERSION}.linux-amd64.tar.gz"
   fi
 }
 
@@ -197,18 +209,26 @@ function install_from_git() {
       cargo install --path . --root "$HOME/.local"
       ;;
     go)
-      if ! command -v go &> /dev/null; then
-        echo -e "${PURPLE}Installing Go${RESET}"
-        GO_VERSION="1.21.1"
-        wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
-        tar -C "$HOME/.local" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
-        export PATH="$HOME/.local/go/bin:$PATH"
-        rm "go${GO_VERSION}.linux-amd64.tar.gz"
-      fi
+      install_go
       mkdir -p "$HOME/.local/bin"
       go build -o "$HOME/.local/bin/$package_name"
       ;;
+    fzf)
+      install_go
+      echo -e "${PURPLE}Building fzf${RESET}"
+      make
+      make install
+      echo -e "${PURPLE}Installing fzf into $HOME/.local/bin${RESET}"
+      mkdir -p "$HOME/.local/bin"
+      cp bin/* "$HOME/.local/bin/"
+      ;;
     make)
+	#curl -O https://ftp.gnu.org/pub/gnu/gettext/gettext-0.22.5.tar.gz
+	#tar xvf gettext-0.22.5.tar.gz
+	#cd gettext-0.22.5/
+	#./configure --prefix="$HOME/.local"
+	#make
+	#make install
       make prefix="$HOME/.local" -j"$(nproc)"
       make install prefix="$HOME/.local"
       ;;
