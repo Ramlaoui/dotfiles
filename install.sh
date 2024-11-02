@@ -6,22 +6,36 @@ set -e
 
 DOTFILES_DIR="${DOTFILES_DIR:-${SRC_DIR:-$HOME/dotfiles}}"
 
-# Parse command-line arguments
+# Initialize variables
 STOW_ONLY=false
+CORE_DEPENDENCY_ARGS=()
 
+# Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
         --stow-only)
             STOW_ONLY=true
-            shift # past argument
+            shift
+            ;;
+        --no-sudo)
+            CORE_DEPENDENCY_ARGS+=("--no-sudo")
+            shift
+            ;;
+        --auto-yes)
+            CORE_DEPENDENCY_ARGS+=("--auto-yes")
+            shift
             ;;
         -h|--help)
-            echo "Usage: $0 [--stow-only]"
-            echo "  --stow-only     Only apply 'stow' to the folder, skip dependencies installation."
+            echo "Usage: $0 [options]"
+            echo "Options:"
+            echo "  --stow-only     Only apply 'stow' to the folders, skip dependencies installation."
+            echo "  --no-sudo       Install packages from source without using sudo."
+            echo "  --auto-yes      Automatically agree to prompts."
+            echo "  -h, --help      Show this help message and exit."
             exit 0
             ;;
-        *)    # unknown option
+        *)
             echo "Unknown option: $1"
             exit 1
             ;;
@@ -36,8 +50,8 @@ if [ "$STOW_ONLY" = true ]; then
     exit 0
 fi
 
-# Install core dependencies
-./scripts/installs/core-dependency.sh
+# Install core dependencies, passing the arguments
+./scripts/installs/core-dependency.sh "${CORE_DEPENDENCY_ARGS[@]}"
 
 # Setup tmux
 read -p "Do you want to install tmux plugins? This will remove the current tmux configuration [y/n] " -n 1 -r
