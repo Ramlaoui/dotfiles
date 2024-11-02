@@ -1,11 +1,12 @@
-ZSH_DIR=$HOME/.config/zsh
 ZDOTDIR=$HOME # The only way to change this from the default is to set it in the environment before starting zsh (.zshenv)...
+ZSH_DIR=$HOME/.config/zsh
 
 export TERM='xterm-256color'
 
 [[ $- != *i* ]] && return # if not interactive shell, return
 
 # Source 
+source $HOME/.zshrc.local
 
 # Source exports
 [[ ! -f $ZSH_DIR/.exports ]] || source $ZSH_DIR/.exports
@@ -36,5 +37,3 @@ zle -N zle-keymap-select
 
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
 export PATH="/home/ramlaouiali/usr/local/bin:$PATH"
-
-source $HOME/.zshrc.local
