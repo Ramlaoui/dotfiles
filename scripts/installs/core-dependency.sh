@@ -1,41 +1,8 @@
 #!/usr/bin/env bash
 
-# Credits to https://raw.githubusercontent.com/Lissy93/dotfiles/HEAD/scripts/installs/prerequisites.sh
-
-# TODO: Separate core packages from optional packages
-
-core_packages=(
-    "git" # Manage dependencies and dotfiles
-    "curl" # Download files
-    "python3-venv" # Python virtual environments
-    "neovim" # Text editor
-    "fd-find" # Find files
-    "git-delta" # Git diff viewer
-    "bat" # Cat clone with syntax highlighting
-    "eza" # Better ls
-    "tldr" # Simplified man
-    "zsh" # Shell
-    "htop" # System monitor
-    "fzf" # Fuzzy finder
-    "tmux" # Terminal multiplexer
-    "stow" # Dotfile manager (symlinks)
-)
-
-# List of packages with their repository URLs and build types
-declare -a git_packages=(
-  "git git https://github.com/git/git make"
-  "curl curl https://github.com/curl/curl autotools"
-  # "python3-venv https://github.com/python/cpython autotools"
-  "neovim https://github.com/neovim/neovim cmake"
-  "fd-find fd https://github.com/sharkdp/fd rust"
-  "git-delta delta https://github.com/dandavison/delta rust"
-  "bat bat https://github.com/sharkdp/bat rust"
-  "zsh zsh https://github.com/zsh-users/zsh autotools"
-  "htop htop https://github.com/htop-dev/htop autotools"
-  "fzf fzf https://github.com/junegunn/fzf go"
-  "tmux tmux https://github.com/tmux/tmux autotools"
-  "stow stow https://github.com/aspiers/stow stow"
-)
+# Prerequisite Dependency Installation Script
+# This script installs necessary packages, detecting the OS and using the appropriate package manager.
+# If sudo permissions are not available or the --no-sudo flag is used, it installs packages from source.
 
 # Color variables
 PURPLE='\033[0;35m'
@@ -43,248 +10,247 @@ YELLOW='\033[0;93m'
 LIGHT='\x1b[2m'
 RESET='\033[0m'
 
-# Shows help menu / introduction
-function print_usage () {
-  echo -e "${PURPLE}Prerequisite Dependency Installation Script${LIGHT}\n"\
-  "There's a few packages that are needed in order to continue with setting up dotfiles.\n"\
-  "This script will detect distro and use appropriate package manager to install apps.\n"\
-  "Elavated permissions may be required. Ensure you've read the script before proceeding."\
-  "\n${RESET}"
-}
+# Parse command-line options
+USE_SUDO=true
+AUTO_YES=false
 
-function install_debian () {
-  echo -e "${PURPLE}Installing ${1} via apt-get${RESET}"
-  sudo apt install $1 -y
-  sudo apt upgrade $1 -y
-}
-function install_arch () {
-  echo -e "${PURPLE}Installing ${1} via Pacman${RESET}"
-  sudo pacman -S $1 --noconfirm
-  sudo pacman -Syu $1 --noconfirm
-}
-function install_mac () {
-  echo -e "${PURPLE}Installing ${1} via Homebrew${RESET}"
-  brew install $1 -y
-  brew upgrade $1 -y
-}
-function get_homebrew () {
-  echo -e "${PURPLE}Setting up Homebrew${RESET}"
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  export PATH=/opt/homebrew/bin:$PATH
-}
-
-# Detect OS type, then triggers install using appropriate package manager
-function multi_system_install () {
-  app=$1
-  if [ "$(uname -s)" = "Darwin" ]; then
-    if ! hash brew 2> /dev/null; then get_homebrew; fi
-    install_mac $app # MacOS via Homebrew
-elif [ "$(uname -s)" = "Linux" ] && hash pacman 2> /dev/null; then
-    install_arch $app # Arch Linux via Pacman
-elif [ "$(uname -s)" = "Linux" ] && hash apt 2> /dev/null; then
-    install_debian $app # Debian via apt-get
-  else
-    echo -e "${YELLOW}Skipping ${app}, as couldn't detect system type ${RESET}"
-  fi
-}
-
-# Function to install packages from Git repositories
-function install_from_git () {
-  local package_name="$1"
-  local repo_url="$2"
-  local build_type="$3"
-  
-  echo -e "${PURPLE}Installing ${package_name} from Git${RESET}"
-  
-  local repo_name=$(basename "$repo_url" .git)
-  
-  echo -e "${PURPLE}Cloning ${repo_url}${RESET}"
-  git clone "$repo_url"
-  
-  cd "$repo_name" || exit 1
-  
-  echo -e "${PURPLE}Building and installing ${package_name}${RESET}"
-  
-  case "$build_type" in
-    autotools)
-      ./configure --prefix="$HOME/.local"
-      make
-      make install
+for arg in "$@"; do
+  case $arg in
+    --no-sudo)
+      USE_SUDO=false
+      shift
       ;;
-    cmake)
-      cmake . -DCMAKE_INSTALL_PREFIX="$HOME/.local"
-      make
-      make install
+    --auto-yes)
+      AUTO_YES=true
+      shift
       ;;
-    rust)
-      if ! hash "cargo" 2> /dev/null; then
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-        export PATH="$HOME/.cargo/bin:$PATH"
-      else
-          echo -e "rust already installed"
-      fi
-      cargo install --path . --root "$HOME/.local"
-      ;;
-    go)
-      export PATH="$HOME/go/bin:$PATH"
-      if ! hash "go" 2> /dev/null; then
-          wget https://go.dev/dl/go1.23.2.linux-amd64.tar.gz
-          mkdir -p "$HOME/go"
-          tar -C "$HOME/go" --strip-components=1 -xzf go1.23.2.linux-amd64.tar.gzb
-          rm -rf go1.23.2.linux-amd64.tar.gzb
-      else
-          echo -e "rust already installed"
-      fi
-      go build -o "$HOME/.local/bin/$package_name"
-      ;;
-    make)
-      make prefix="$HOME/.local"
-      make install prefix="$HOME/.local"
-      ;;
-    perl)
-      perl Makefile.PL PREFIX="$HOME/.local"
-      make
-      make install
-      ;;
-    stow)
-        if ! hash "cpanm" 2> /dev/null; then
-        # Download the cpanminus script
-            curl -L https://cpanmin.us -o cpanm
-            chmod +x cpanm
-
-            # Move cpanm to your local bin directory
-            mkdir -p "$HOME/.local/bin"
-            mv cpanm "$HOME/.local/bin/"
-
-            # Ensure your local bin directory is in your PATH
-            export PATH="$HOME/.local/bin:$PATH"
-        fi
-      cpanm -l "$HOME/.local" Test::Output
-      export PERL5LIB="$HOME/.local/lib/perl5:$PERL5LIB"
-    if ! hash "makeinfo" 2> /dev/null; then
-      wget https://ftp.gnu.org/gnu/texinfo/texinfo-7.1.tar.xz
-      tar xf texinfo-7.1.tar.xz
-        cd texinfo-7.1
-        ./configure --prefix="$HOME/.local" --disable-perl-xs
-        make
-    make install
-    cd ../
-    rm -rf texinfo-7.1.tar.xz
-    rm -rf texinfo-7.1
-    fi
-      autoreconf -iv
-      ./configure --prefix="$HOME/.local"
-      make
-      make install
+    --help)
+      SHOW_HELP=true
+      shift
       ;;
     *)
-      echo "Unknown build type: $build_type"
       ;;
   esac
-  
-  # cd ..
-  # rm -rf "$repo_name"
+done
+
+# Help menu
+function print_usage() {
+  echo -e "${PURPLE}Prerequisite Dependency Installation Script${LIGHT}\n"\
+  "This script installs necessary packages for setting up dotfiles.\n"\
+  "It detects the OS and uses the appropriate package manager or installs from source.\n"\
+  "Options:\n"\
+  "  --no-sudo    Install packages from source without using sudo.\n"\
+  "  --auto-yes   Automatically agree to prompts.\n"\
+  "  --help       Show this help message and exit.\n${RESET}"
 }
 
-# Show usage instructions, help menu
-print_usage
-if [[ $* == *"--help"* ]]; then exit; fi
+# Show help menu if requested
+if [ "$SHOW_HELP" = true ]; then
+  print_usage
+  exit 0
+fi
 
-# Ask user if they'd like to proceed
-if [[ ! $* == *"--auto-yes"* ]] ; then
+# Prompt user to continue
+if [ "$AUTO_YES" = false ]; then
   echo -e "${PURPLE}Are you happy to continue? (y/N)${RESET}"
-  read -t 15 -n 1 -r
+  read -r -n 1 -t 15 REPLY
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${YELLOW}Proceeding was rejected by user, exiting...${RESET}"
+    echo -e "${YELLOW}Proceeding was rejected by user. Exiting...${RESET}"
     exit 0
   fi
 fi
 
-# For each app, check if not present and install
-# for app in ${core_packages[@]}; do
-#   if ! hash "${app}" 2> /dev/null; then
-#     multi_system_install $app
-#   else
-#     echo -e "${YELLOW}${app} is already installed, skipping${RESET}"
-#   fi
-# done
+# Check if sudo is available
+if ! command -v sudo &> /dev/null; then
+  USE_SUDO=false
+fi
 
-for package_info in "${git_packages[@]}"; do
-  read -r package_name package_cmd repo_url build_type <<< "$package_info"
-  if ! hash "${package_cmd}" 2> /dev/null; then
-      install_from_git "$package_name" "$repo_url" "$build_type"
+# Update PATH for local installations
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
+
+# Package lists
+core_packages=(
+  "git"
+  "curl"
+  "python3-venv"
+  "neovim"
+  "fd-find"
+  "git-delta"
+  "bat"
+  "eza"
+  "tldr"
+  "zsh"
+  "htop"
+  "fzf"
+  "tmux"
+  "stow"
+)
+
+declare -A git_packages
+git_packages=(
+  ["git"]="https://github.com/git/git make"
+  ["curl"]="https://github.com/curl/curl autotools"
+  ["neovim"]="https://github.com/neovim/neovim cmake"
+  ["fd"]="https://github.com/sharkdp/fd rust"
+  ["delta"]="https://github.com/dandavison/delta rust"
+  ["bat"]="https://github.com/sharkdp/bat rust"
+  ["zsh"]="https://github.com/zsh-users/zsh autotools"
+  ["htop"]="https://github.com/htop-dev/htop autotools"
+  ["fzf"]="https://github.com/junegunn/fzf go"
+  ["tmux"]="https://github.com/tmux/tmux autotools"
+  ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
+)
+
+# Installation functions
+function install_debian() {
+  echo -e "${PURPLE}Installing ${1} via apt-get${RESET}"
+  sudo apt-get update -y
+  sudo apt-get install -y "$1"
+}
+
+function install_arch() {
+  echo -e "${PURPLE}Installing ${1} via pacman${RESET}"
+  sudo pacman -Sy --noconfirm "$1"
+}
+
+function install_mac() {
+  echo -e "${PURPLE}Installing ${1} via Homebrew${RESET}"
+  brew install "$1"
+}
+
+function get_homebrew() {
+  echo -e "${PURPLE}Setting up Homebrew${RESET}"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  export PATH="/opt/homebrew/bin:$PATH"
+}
+
+# Detect OS and install package
+function multi_system_install() {
+  local app="$1"
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if ! command -v brew &> /dev/null; then
+      get_homebrew
+    fi
+    install_mac "$app"
+  elif [ -f "/etc/arch-release" ]; then
+    install_arch "$app"
+  elif [ -f "/etc/debian_version" ]; then
+    install_debian "$app"
   else
-      echo -e "${YELLOW}${app} is already installed, skipping${RESET}"
+    echo -e "${YELLOW}Skipping ${app}, could not detect system type.${RESET}"
+  fi
+}
+
+# Function to install packages from Git repositories
+function install_from_git() {
+  local package_name="$1"
+  local repo_url="$2"
+  local build_type="$3"
+
+  echo -e "${PURPLE}Installing ${package_name} from source${RESET}"
+
+  # Create build directory
+  BUILD_DIR="$HOME/build/${package_name}"
+  mkdir -p "$BUILD_DIR"
+  cd "$BUILD_DIR" || exit 1
+
+  # Clone repository
+  if [ ! -d "${BUILD_DIR}/$(basename "$repo_url" .git)" ]; then
+    echo -e "${PURPLE}Cloning ${repo_url}${RESET}"
+    git clone "$repo_url"
+  else
+    echo -e "${YELLOW}${package_name} source already exists. Pulling latest changes.${RESET}"
+    cd "$(basename "$repo_url" .git)" || exit 1
+    git pull
+    cd ..
+  fi
+
+  cd "$(basename "$repo_url" .git)" || exit 1
+
+  # Set environment variables
+  export CFLAGS="-I$HOME/.local/include $CFLAGS"
+  export LDFLAGS="-L$HOME/.local/lib $LDFLAGS"
+  export PKG_CONFIG_PATH="$HOME/.local/lib/pkgconfig:$PKG_CONFIG_PATH"
+  export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"
+
+  # Build and install
+  case "$build_type" in
+    autotools)
+      ./autogen.sh 2>/dev/null || true
+      ./configure --prefix="$HOME/.local"
+      make -j"$(nproc)"
+      make install
+      ;;
+    cmake)
+      mkdir -p build && cd build || exit 1
+      cmake .. -DCMAKE_INSTALL_PREFIX="$HOME/.local"
+      make -j"$(nproc)"
+      make install
+      ;;
+    rust)
+      if ! command -v cargo &> /dev/null; then
+        echo -e "${PURPLE}Installing Rust${RESET}"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        export PATH="$HOME/.cargo/bin:$PATH"
+      fi
+      cargo install --path . --root "$HOME/.local"
+      ;;
+    go)
+      if ! command -v go &> /dev/null; then
+        echo -e "${PURPLE}Installing Go${RESET}"
+        GO_VERSION="1.21.1"
+        wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
+        tar -C "$HOME/.local" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
+        export PATH="$HOME/.local/go/bin:$PATH"
+        rm "go${GO_VERSION}.linux-amd64.tar.gz"
+      fi
+      mkdir -p "$HOME/.local/bin"
+      go build -o "$HOME/.local/bin/$package_name"
+      ;;
+    make)
+      make prefix="$HOME/.local" -j"$(nproc)"
+      make install prefix="$HOME/.local"
+      ;;
+    perl)
+      if ! command -v cpanm &> /dev/null; then
+        echo -e "${PURPLE}Installing cpanminus${RESET}"
+        curl -L https://cpanmin.us -o "$HOME/.local/bin/cpanm"
+        chmod +x "$HOME/.local/bin/cpanm"
+      fi
+      export PERL5LIB="$HOME/.local/lib/perl5:$PERL5LIB"
+      cpanm -l "$HOME/.local" --installdeps .
+      perl Makefile.PL PREFIX="$HOME/.local"
+      make -j"$(nproc)"
+      make install
+      ;;
+    *)
+      echo -e "${YELLOW}Unknown build type: $build_type${RESET}"
+      ;;
+  esac
+
+  # Return to initial directory
+  cd "$HOME" || exit 1
+}
+
+# Main installation logic
+for app in "${core_packages[@]}"; do
+  if ! command -v "$app" &> /dev/null; then
+    if [ "$USE_SUDO" = true ]; then
+      multi_system_install "$app"
+    else
+      if [ -n "${git_packages[$app]}" ]; then
+        IFS=' ' read -r repo_url build_type <<< "${git_packages[$app]}"
+        install_from_git "$app" "$repo_url" "$build_type"
+      else
+        echo -e "${YELLOW}No installation method for $app without sudo. Skipping.${RESET}"
+      fi
+    fi
+  else
+    echo -e "${YELLOW}${app} is already installed. Skipping.${RESET}"
   fi
 done
 
-
-# check if tmux is available
-if ! command -v tmux &> /dev/null
-then
-    echo "installing tmux from source"
-
-    # necessary packages are libevent-dev and ncurses-dev https://github.com/tmux/tmux/wiki/Installing
-    
-    git clone https://github.com/tmux/tmux.git $HOME/.local/src/tmux
-    cd $HOME/.local/src/tmux
-    # requires autotools-dev and automake and clang
-    sh autogen.sh
-    ./configure && make && make install
-
-    # move tmux to $HOME/.local/bin if not already done
-
-    # add tmux to PATH (this should be in exports)
-    export PATH=$HOME/.local/bin:$PATH
-fi
-
-# check if nvim is available
-if ! command -v nvim &> /dev/null; then
-    echo "nvim is not installed"
-
-    echo "Installing from source"
-
-    # Define the target directory
-    TARGET_DIR="$HOME/.local/src/neovim"
-
-    # Check if the repository is already cloned
-    if [ -d "$TARGET_DIR/.git" ]; then
-        echo "Repository already cloned at $TARGET_DIR"
-    else
-        # Clone the repository since it's not present
-        git clone https://github.com/neovim/neovim.git -b stable "$TARGET_DIR"
-    fi
-
-    cd $HOME/.local/src/neovim
-    make CMAKE_BUILD_TYPE=Release
-    make CMAKE_INSTALL_PREFIX=$HOME/.local install
-
-fi
-
-
-
-# check if fzf is available
-if [! command -v fzf &> /dev/null]; then
-    echo "fzf is not installed"
-
-    echo "Installing from source"
-
-    # Define the target directory
-    TARGET_DIR="$HOME/.fzf"
-
-    # Check if the repository is already cloned
-    if [ -d "$TARGET_DIR/.git" ]; then
-        echo "Repository already cloned at $TARGET_DIR"
-    else
-        # Clone the repository since it's not present
-        git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-~/.fzf/install
-    fi
-
-fi
-
 # All done
-echo -e "\n${PURPLE}Jobs complete, exiting${RESET}"
+echo -e "\n${PURPLE}All tasks completed successfully.${RESET}"
 exit 0
-
