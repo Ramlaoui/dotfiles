@@ -36,7 +36,7 @@ return {
 				"graphql",
 				"emmet_ls",
 				"prismals",
-				"pyright",
+				"pyright", -- lsp
 			},
 			-- auto-install configured servers (with lspconfig)
 			automatic_installation = true, -- not the same as ensure_installed
@@ -48,8 +48,7 @@ return {
 				"stylua", -- lua formatter
 				"isort", -- python formatter
 				"black", -- python formatter
-				-- "ruff-lsp", -- python linter
-				"mypy", -- python linter
+				"flake8", -- python linter
 				"eslint_d", -- js linter
 			},
 		})
