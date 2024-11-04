@@ -50,6 +50,7 @@ return {
 				"black", -- python formatter
 				"flake8", -- python linter
 				"eslint_d", -- js linter
+                "shfmt", -- shell formatter
 			},
 		})
 
