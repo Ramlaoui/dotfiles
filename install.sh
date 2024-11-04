@@ -47,7 +47,8 @@ if [ "$STOW_ONLY" = true ]; then
     stow zsh \
         tmux \
         nvim \
-        git
+        git \
+        python
     exit 0
 fi
 
