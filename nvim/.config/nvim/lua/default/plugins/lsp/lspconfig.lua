@@ -18,11 +18,6 @@ return {
 		local on_attach = function(client, bufnr)
 			opts.buffer = bufnr
 
-			if client.name == "ruff_lsp" then
-				-- Disable hover in favor of Pyright
-				client.server_capabilities.hoverProvider = false
-			end
-
 			-- set keybinds
 			opts.desc = "Show LSP references"
 			keymap.set("n", "gR", "<cmd>Telescope lsp_references<CR>", opts) -- show definition, references
@@ -87,60 +82,6 @@ return {
 			on_attach = on_attach,
 		})
 
-		-- configure tailwindcss server
-		lspconfig["tailwindcss"].setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-		})
-
-		-- configure svelte server
-		lspconfig["svelte"].setup({
-			capabilities = capabilities,
-			on_attach = function(client, bufnr)
-				on_attach(client, bufnr)
-
-				vim.api.nvim_create_autocmd("BufWritePost", {
-					pattern = { "*.js", "*.ts" },
-					callback = function(ctx)
-						if client.name == "svelte" then
-							client.notify("$/onDidChangeTsOrJsFile", { uri = ctx.file })
-						end
-					end,
-				})
-			end,
-		})
-
-		-- configure prisma orm server
-		lspconfig["prismals"].setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-		})
-
-		-- configure graphql language server
-		lspconfig["graphql"].setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-			filetypes = { "graphql", "gql", "svelte", "typescriptreact", "javascriptreact" },
-		})
-
-		-- configure emmet language server
-		lspconfig["emmet_ls"].setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-			filetypes = { "html", "typescriptreact", "javascriptreact", "css", "sass", "scss", "less", "svelte" },
-		})
-
-		lspconfig.ruff_lsp.setup({
-			capabilities = capabilities,
-			on_attach = on_attach,
-			init_options = {
-				settings = {
-					-- args = { "--config=~/.config/python/pyproject.toml" },
-					-- args = { "--line-length=127" }, -- Later set a default config that can be overridden
-				},
-			},
-		})
-
 		vim.api.nvim_create_autocmd("LspAttach", {
 			group = vim.api.nvim_create_augroup("lsp_attach_disable_ruff_hover", { clear = true }),
 			callback = function(args)
@@ -156,24 +97,24 @@ return {
 			desc = "LSP: Disable hover capability from Ruff",
 		})
 
-		-- -- configure python server
-		-- lspconfig["pyright"].setup({
-		-- 	capabilities = capabilities,
-		-- 	on_attach = on_attach,
-		-- 	log_level = "debug",
-		-- 	settings = {
-		-- 		pyright = {
-		-- 			disableOrganizeImports = true, -- Using Ruff
-		-- 		},
-		-- 		python = {
-		-- 			analysis = {
-		-- 				ignore = { "*" }, -- Using Ruff
-		-- 				typeCheckingMode = "off", -- Using mypy
-		-- 				diagnosticMode = "openFilesonly",
-		-- 			},
-		-- 		},
-		-- 	},
-		-- })
+		-- configure python server
+		lspconfig["pyright"].setup({
+			capabilities = capabilities,
+			on_attach = on_attach,
+			log_level = "debug",
+			settings = {
+				pyright = {
+					disableOrganizeImports = true, -- Using Ruff
+				},
+				python = {
+					analysis = {
+						ignore = { "*" }, -- Using Ruff
+						typeCheckingMode = "off", -- Using mypy
+						diagnosticMode = "openFilesonly",
+					},
+				},
+			},
+		})
 
 		-- configure lua server (with special settings)
 		lspconfig["lua_ls"].setup({
