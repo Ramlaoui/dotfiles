@@ -11,13 +11,13 @@ zstyle ':prezto:load' pmodule \
     'completion' \
     'prompt' \
     'git' \
-    'fasd' \
     'rsync' \
     'homebrew' \
     'osx' \
     'history-substring-search' \
     'environment' \
     'terminal'
+    # 'fasd' \ slow startup
  
   
 zstyle ':prezto:module:editor' key-bindings 'vi'
