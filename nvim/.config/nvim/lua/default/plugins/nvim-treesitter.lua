@@ -17,14 +17,15 @@ return {
 					enable = true,
 					additional_vim_regex_highlighting = { "markdown" },
 				},
-				-- enable indentation
-				indent = { enable = true },
+				-- -- enable indentation (this breaks orgmode)
+				-- indent = { enable = true },
 				-- enable autotagging (w/ nvim-ts-autotag plugin)
 				autotag = {
 					enable = true,
 				},
 				-- ensure these language parsers are installed
 				auto_install = true,
+				ignore_install = { "org" },
 				incremental_selection = {
 					enable = true,
 					keymaps = {
