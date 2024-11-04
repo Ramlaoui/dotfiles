@@ -32,8 +32,8 @@ zle reset-prompt
 zle -N zle-line-init
 zle -N zle-keymap-select
 
-# Source fzf
-(command -v fzf >/dev/null 2>&1 && source <(fzf --zsh))
+# Source fzf if command fzf succeeds
+command -v fzf >/dev/null && source <(fzf --zsh)
 
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
 export PATH="/home/ramlaouiali/usr/local/bin:$PATH"

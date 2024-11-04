@@ -14,31 +14,31 @@ CORE_DEPENDENCY_ARGS=()
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
-        --stow-only)
-            STOW_ONLY=true
-            shift
-            ;;
-        --no-sudo)
-            CORE_DEPENDENCY_ARGS+=("--no-sudo")
-            shift
-            ;;
-        --auto-yes)
-            CORE_DEPENDENCY_ARGS+=("--auto-yes")
-            shift
-            ;;
-        -h|--help)
-            echo "Usage: $0 [options]"
-            echo "Options:"
-            echo "  --stow-only     Only apply 'stow' to the folders, skip dependencies installation."
-            echo "  --no-sudo       Install packages from source without using sudo."
-            echo "  --auto-yes      Automatically agree to prompts."
-            echo "  -h, --help      Show this help message and exit."
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
+    --stow-only)
+        STOW_ONLY=true
+        shift
+        ;;
+    --no-sudo)
+        CORE_DEPENDENCY_ARGS+=("--no-sudo")
+        shift
+        ;;
+    --auto-yes)
+        CORE_DEPENDENCY_ARGS+=("--auto-yes")
+        shift
+        ;;
+    -h | --help)
+        echo "Usage: $0 [options]"
+        echo "Options:"
+        echo "  --stow-only     Only apply 'stow' to the folders, skip dependencies installation."
+        echo "  --no-sudo       Install packages from source without using sudo."
+        echo "  --auto-yes      Automatically agree to prompts."
+        echo "  -h, --help      Show this help message and exit."
+        exit 0
+        ;;
+    *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
     esac
 done
 
@@ -76,7 +76,7 @@ XDG_DATA_HOME=$HOME/.local/share
 ZSH_HOME=$HOME/.zsh
 
 # Install Starship prompt
-if command -v starship > /dev/null; then
+if command -v starship >/dev/null; then
     echo "Starship is already installed"
 else
     echo "Installing Starship..."
@@ -107,7 +107,7 @@ fi
 NVIM=$HOME/.local/
 mkdir -p $NVIM
 
-if command -v nvim > /dev/null; then
+if command -v nvim >/dev/null; then
     echo "NVIM appears to be installed"
 else
     mkdir -p $NVIM/bin
@@ -135,7 +135,7 @@ NODE_ENV=$XDG_DATA_HOME/node
 if [[ ! -d $NODE_ENV ]]; then
     mkdir -p $NODE_ENV
     NODE_SCRIPT=$NODE_ENV/install-node.sh
-    if command -v curl > /dev/null; then
+    if command -v curl >/dev/null; then
         curl -sL install-node.now.sh/lts -o $NODE_SCRIPT
     else
         echo "ERROR: curl is not installed"
