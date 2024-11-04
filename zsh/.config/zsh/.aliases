@@ -27,7 +27,7 @@ alias ff='find . -type f -name' # Find a file by name within current directory
 
 # Displaying files
 (( $+commands[bat] )) && alias cat='bat' # Use bat instead of cat
-(( $+commands[eza] )) && alias ls='eza' # Use exa instead of ls
+(( $+commands[eza] )) && alias ls='eza -la' # Use exa instead of ls
 
 # External Services
 alias myip='curl ipv4.icanhazip.com'
