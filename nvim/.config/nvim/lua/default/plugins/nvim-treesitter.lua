@@ -15,7 +15,8 @@ return {
 			treesitter.setup({ -- enable syntax highlighting
 				highlight = {
 					enable = true,
-					additional_vim_regex_highlighting = { "markdown" },
+                    disable = { "latex" },
+					additional_vim_regex_highlighting = { "latex", "markdown"},
 				},
 				-- -- enable indentation (this breaks orgmode)
 				-- indent = { enable = true },
