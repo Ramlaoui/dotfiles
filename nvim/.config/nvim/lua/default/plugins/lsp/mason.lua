@@ -1,6 +1,7 @@
 return {
 	"williamboman/mason.nvim",
 	version = false,
+	lazy = true,
 	dependencies = {
 		"williamboman/mason-lspconfig.nvim",
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
@@ -50,7 +51,7 @@ return {
 				"black", -- python formatter
 				"flake8", -- python linter
 				"eslint_d", -- js linter
-                "shfmt", -- shell formatter
+				"shfmt", -- shell formatter
 			},
 		})
 
