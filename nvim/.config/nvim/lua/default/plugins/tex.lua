@@ -4,6 +4,7 @@ return {
 	config = function()
 		-- PDF Viewer:
 		-- http://manpages.ubuntu.com/manpages/trusty/man5/zathurarc.5.html
+
 		vim.g.vimtex_view_method = "sioyek"
 		vim.g.vimtex_quickfix_mode = 0
 		-- for synctex, install xdotool
