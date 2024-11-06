@@ -140,3 +140,11 @@ function tresizeright() {
   tmux resize-pane -R "$@"
 }
 
+# Rsync helpers
+function rsync () {
+    if [ -f "$XDG_CONFIG_HOME/rsync/.rsync.exclude" ]; then
+        set -- --exclude-from="$XDG_CONFIG_HOME/rsync/.rsync.exclude" "$@"
+    fi
+
+    command rsync "$@"
+}
