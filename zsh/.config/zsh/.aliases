@@ -13,21 +13,21 @@ alias inkscape-watch="inkscape-figures watch"
 # Find + manage aliases
 alias al='alias | less' # List all aliases
 alias as='alias | grep' # Search aliases
-alias ar='unalias' # Remove given alias
+alias ar='unalias'      # Remove given alias
 
 # Copy / pasting
 alias cpwd='pwd | pbcopy' # Copy current path
-alias pa='pbpaste' # Paste clipboard contents
+alias pa='pbpaste'        # Paste clipboard contents
 
 # Finding files and directories
-alias dud='du -d 1 -h' # List sizes of files within directory
-alias duf='du -sh *' # List total size of current directory
-alias ff='find . -type f -name' # Find a file by name within current directory
-(( $+commands[fd] )) || alias fd='find . -type d -name' # Find direcroy by name
+alias dud='du -d 1 -h'                                  # List sizes of files within directory
+alias duf='du -sh *'                                    # List total size of current directory
+alias ff='find . -type f -name'                         # Find a file by name within current directory
+(($+commands[fd])) || alias fd='find . -type d -name' # Find direcroy by name
 
 # Displaying files
-(( $+commands[bat] )) && alias cat='bat' # Use bat instead of cat
-(( $+commands[eza] )) && alias ls='eza -la' # Use exa instead of ls
+(($+commands[bat])) && alias cat='bat'    # Use bat instead of cat
+(($+commands[eza])) && alias ls='eza -la' # Use exa instead of ls
 
 # External Services
 alias myip='curl ipv4.icanhazip.com'
@@ -37,6 +37,7 @@ alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 
 # orgmode
 alias notes="nvim ~/org/refile.org"
+# alias org="nvim ~/org"
 # fzf to search notes
 
 # SSH
@@ -48,7 +49,6 @@ alias ssadd="ssh-add"
 
 # Git
 alias lg="lazygit"
-
 
 # Tmux shortcuts
 alias tmux='tmux -u'
