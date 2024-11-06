@@ -3,9 +3,13 @@ return {
 	-- 	dependencies = {
 	--		"iurimateus/luasnip-latex-snippets.nvim",
 	--	},
+	build = "make install_jsregexp", -- using ecma regex in snippets
 	lazy = true,
 	config = function()
-		require("luasnip.loaders.from_lua").lazy_load({ paths = "~/.config/nvim/lua/snippets/" })
+		require("luasnip.loaders.from_lua").lazy_load({
+			paths = "~/.config/nvim/lua/snippets/",
+			fs_event_providers = { autocmd = true, libuv = true },
+		})
 
 		local luasnip = require("luasnip")
 
@@ -24,6 +28,10 @@ return {
             " Cycle forward through choice nodes with Control-f (for example)
             imap <silent><expr> <C-f> luasnip#choice_active() ? '<Plug>luasnip-next-choice' : '<C-f>'
             smap <silent><expr> <C-f> luasnip#choice_active() ? '<Plug>luasnip-next-choice' : '<C-f>'
+
+            " Menu-like selection of choice nodes
+            inoremap <c-u> <cmd>lua require("luasnip.extras.select_choice")()<cr>
+
             ]])
 
 		luasnip.setup({
