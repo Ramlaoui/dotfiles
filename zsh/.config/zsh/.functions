@@ -33,6 +33,157 @@ function ssh_server() {
 
     sscopy $server_name
 }
+
+function codessh() {
+    if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+        echo "Usage: vssh <user@host> '[remote_directory]'"
+        return 1
+    fi
+
+    local host=$1
+    local dir=${2:-}
+
+    if [ -z "$dir" ]; then
+        #Resolve directory:
+        dir=$(ssh "$host" 'cd ~ && pwd')
+        # Connect to the SSH server without specifying a directory
+        code --remote ssh-remote+"$host" "$dir"
+    else
+        # Resolve directory:
+        new_dir=$(ssh "$host" "cd ~ && pwd")
+        new_dir="$new_dir/$dir"
+        # Connect to the SSH server and open the specified directory
+        code --remote ssh-remote+"$host" "$new_dir"
+    fi
+}
+
+# File functions
+function tmpclean() {
+    cd $TMPDIR
+    rm -rf *
+}
+
+function mkcd() {
+    mkdir -p "$1" && cd "$1"
+}
+
+function extract() {
+    if [ -z "$1" ]; then
+        echo "Usage: extract <archive_file> [output_directory]"
+        return 1
+    fi
+
+    FILE="$1"
+    OUTPUT_DIR="$2"
+
+    if [ -n "$OUTPUT_DIR" ]; then
+        mkdir -p "$OUTPUT_DIR"
+        OUTPUT_OPTION="-C \"$OUTPUT_DIR\""
+    else
+        OUTPUT_OPTION=""
+    fi
+
+    case "$FILE" in
+        *.tar.bz2|*.tbz2) 
+            eval tar xvjf "$FILE" $OUTPUT_OPTION ;;
+        *.tar.gz|*.tgz) 
+            eval tar xvzf "$FILE" $OUTPUT_OPTION ;;
+        *.tar.xz|*.txz) 
+            eval tar xvJf "$FILE" $OUTPUT_OPTION ;;
+        *.tar.lz|*.tlz) 
+            eval tar --lzip -xvf "$FILE" $OUTPUT_OPTION ;;
+        *.tar.Z)     
+            eval tar xvZf "$FILE" $OUTPUT_OPTION ;;
+        *.tar)       
+            eval tar xvf "$FILE" $OUTPUT_OPTION ;;
+        *.zip)       
+            unzip "$FILE" -d "${OUTPUT_DIR:-.}" ;;
+        *.rar)       
+            unrar x "$FILE" "${OUTPUT_DIR:-.}" ;;
+        *.7z)        
+            7z x "$FILE" "-o${OUTPUT_DIR:-.}" ;;
+        *.gz)        
+            if [ -n "$OUTPUT_DIR" ]; then
+                mkdir -p "$OUTPUT_DIR"
+                gunzip -c "$FILE" > "$OUTPUT_DIR/$(basename "${FILE%.*}")"
+            else
+                gunzip "$FILE"
+            fi ;;
+        *.bz2)       
+            if [ -n "$OUTPUT_DIR" ]; then
+                mkdir -p "$OUTPUT_DIR"
+                bunzip2 -c "$FILE" > "$OUTPUT_DIR/$(basename "${FILE%.*}")"
+            else
+                bunzip2 "$FILE"
+            fi ;;
+        *.xz)        
+            if [ -n "$OUTPUT_DIR" ]; then
+                mkdir -p "$OUTPUT_DIR"
+                unxz -c "$FILE" > "$OUTPUT_DIR/$(basename "${FILE%.*}")"
+            else
+                unxz "$FILE"
+            fi ;;
+        *.Z)         
+            if [ -n "$OUTPUT_DIR" ]; then
+                mkdir -p "$OUTPUT_DIR"
+                uncompress -c "$FILE" > "$OUTPUT_DIR/$(basename "${FILE%.*}")"
+            else
+                uncompress "$FILE"
+            fi ;;
+        *)
+            echo "extract: '$FILE' - unknown archive method"
+            return 1 ;;
+    esac
+}
+
+function compress() {
+    if [ -z "$1" ]; then
+        echo "Usage: compress <file_or_directory> [output_file]"
+        return 1
+    fi
+
+    FILE="$1"
+    OUTPUT_FILE="$2"
+
+    if [ -n "$OUTPUT_FILE" ]; then
+        OUTPUT_OPTION="-o \"$OUTPUT_FILE\""
+    else
+        OUTPUT_OPTION=""
+    fi
+
+    case "$FILE" in
+        *.tar.bz2|*.tbz2) 
+            eval tar cvjf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.tar.gz|*.tgz) 
+            eval tar cvzf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.tar.xz|*.txz) 
+            eval tar cvJf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.tar.lz|*.tlz) 
+            eval tar --lzip -cvf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.tar.Z)     
+            eval tar cvZf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.tar)       
+            eval tar cvf "$OUTPUT_FILE" $OUTPUT_OPTION "$FILE" ;;
+        *.zip)       
+            zip -r "$OUTPUT_FILE" "$FILE" ;;
+        *.rar)       
+            rar a "$OUTPUT_FILE" "$FILE" ;;
+        *.7z)        
+            7z a "$OUTPUT_FILE" "$FILE" ;;
+        *.gz)        
+            gzip -c "$FILE" > "$OUTPUT_FILE" ;;
+        *.bz2)       
+            bzip2 -c "$FILE" > "$OUTPUT_FILE" ;;
+        *.xz)        
+            xz -c "$FILE" > "$OUTPUT_FILE" ;;
+        *.Z)         
+            compress -c "$FILE" > "$OUTPUT_FILE" ;;
+        *)
+            echo "compress: '$FILE' - unknown archive method"
+            return 1 ;;
+    esac
+}
+     
     
 # Latex functions
 function latexnote() {

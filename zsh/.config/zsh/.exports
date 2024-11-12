@@ -4,7 +4,7 @@
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:=$HOME/.config}"
 export XDG_DATA_HOME="$HOME/.local/share"
 
-#
+# Set NPM prefix
 export NPM_CONFIG_PREFIX="$XDG_DATA_HOME/node"
 
 # Set PATH
@@ -22,3 +22,10 @@ export CM_LAUNCHER="fzf"
 # Python REPL for vi editing mode on new versions
 export PYTHON_BASIC_REPL=1
 export IPYTHONDIR="$XDG_CONFIG_HOME/ipython"
+
+# XTerm
+export DISPLAY=:0
+
+# Folders
+export ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+export ADMIN="$ICLOUD/admin"
