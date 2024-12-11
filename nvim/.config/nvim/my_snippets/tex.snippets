@@ -24,11 +24,6 @@ snippet header_template "Imports and stuff - advanced" b
 
 \geometry{tmargin=.75in, bmargin=.75in, lmargin=.75in, rmargin = .75in}  
 
-\newcommand{\incfig}[2][1]{%
-    \def\svgwidth{#1\columnwidth}
-    \import{./figures/}{#2.pdf_tex}
-}
-
 \newtheorem{theorem}{Theorem}
 \newtheorem{definition}{Definition}
 \newtheorem{conv}{Convention}
@@ -45,6 +40,7 @@ snippet header_template "Imports and stuff - advanced" b
 \newcommand{\Cdot}{\boldsymbol{\cdot}}
 \newcommand{\Cov}{\mathrm{Cov}}
 \newcommand{\Var}{\mathrm{Var}}
+
 endsnippet
 
 snippet template "Basic template" b

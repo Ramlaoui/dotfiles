@@ -36,4 +36,4 @@ zle -N zle-keymap-select
 command -v fzf >/dev/null && source <(fzf --zsh)
 
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
-export PATH="/home/ramlaouiali/usr/local/bin:$PATH"
+
