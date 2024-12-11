@@ -316,6 +316,7 @@ c = get_config()  # noqa
 #  Default: 'IPython.terminal.interactiveshell.TerminalInteractiveShell'
 # c.TerminalIPythonApp.interactive_shell_class = 'IPython.terminal.interactiveshell.TerminalInteractiveShell'
 c.TerminalInteractiveShell.editing_mode = "vi"
+c.TerminalInteractiveShell.emacs_bindings_in_vi_insert_mode = False
 
 ##
 #  See also: BaseIPythonApplication.ipython_dir

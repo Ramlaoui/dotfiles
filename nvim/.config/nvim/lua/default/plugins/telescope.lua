@@ -2,6 +2,7 @@ return {
 	"nvim-telescope/telescope.nvim",
 	branch = "0.1.x",
 	dependencies = {
+		"nvim-telescope/telescope-bibtex.nvim",
 		"nvim-lua/plenary.nvim",
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
 		"nvim-tree/nvim-web-devicons",
@@ -9,6 +10,8 @@ return {
 	config = function()
 		local telescope = require("telescope")
 		local actions = require("telescope.actions")
+
+		telescope.load_extension("bibtex")
 
 		telescope.setup({
 			pickers = {
@@ -23,6 +26,26 @@ return {
 						["<C-k>"] = actions.move_selection_previous, -- move to prev result
 						["<C-j>"] = actions.move_selection_next, -- move to next result
 						["<C-q>"] = actions.send_selected_to_qflist + actions.open_qflist,
+					},
+				},
+			},
+			extensions = {
+				-- Telescope bibtex
+				bibtex = {
+					depth = 1,
+					custom_formats = {
+						{
+							id = "zettel",
+							cite_marker = "#%s",
+						},
+					},
+					format = "zettel",
+					citation_max_auth = 2,
+					context = false,
+					context_fallback = true,
+					wrap = false,
+					global_files = {
+						"~/Library/Mobile Documents/com~apple~CloudDocs/zotero/bibs/references.bib",
 					},
 				},
 			},

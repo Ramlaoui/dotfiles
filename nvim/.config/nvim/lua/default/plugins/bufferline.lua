@@ -25,7 +25,7 @@ return {
 		map("n", "<leader>7", ":BufferLineGoToBuffer 7<CR>", opts)
 		map("n", "<leader>8", ":BufferLineGoToBuffer 8<CR>", opts)
 		map("n", "<leader>9", ":BufferLineGoToBuffer 9<CR>", opts)
-		map("n", "<leader>bl", ":BufferLineCycleNext<CR>", opts)
+		map("n", "<leader>bx", ":BufferLineCycleNext<CR>", opts)
 		map("n", "<leader>bh", ":BufferLineCyclePrev<CR>", opts)
 		map("n", "<leader>bd", ":BufferLinePickClose<CR>", opts)
 	end,

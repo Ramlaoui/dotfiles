@@ -16,5 +16,8 @@ return {
 		-- 		auto_trigger = true,
 		-- 	},
 		-- })
+
+		-- Fallback completion keymap to Alt-<Tab>
+		vim.api.nvim_set_keymap("i", "<A-Tab>", "v:lua.copilot_tab()", { expr = true })
 	end,
 }
