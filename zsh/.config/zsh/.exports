@@ -29,3 +29,6 @@ export DISPLAY=:0
 # Folders
 export ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 export ADMIN="$ICLOUD/admin"
+
+# Git signing
+export GPG_TTY=$(tty)
