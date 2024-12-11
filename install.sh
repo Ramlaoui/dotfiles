@@ -42,13 +42,15 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Apply stow to the folders
+stow zsh \
+    tmux \
+    nvim \
+    git \
+    python
+
 if [ "$STOW_ONLY" = true ]; then
     echo "Running stow only, skipping dependencies installation."
-    stow zsh \
-        tmux \
-        nvim \
-        git \
-        python
     exit 0
 fi
 
@@ -66,11 +68,6 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 else
     echo "Skipping tmux plugin installation"
 fi
-
-# Apply stow to the folders
-stow zsh \
-    tmux \
-    nvim
 
 XDG_CONFIG_HOME=$HOME/.config
 XDG_DATA_HOME=$HOME/.local/share
