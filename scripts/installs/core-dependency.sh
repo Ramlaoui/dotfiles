@@ -27,6 +27,7 @@ core_packages=(
     "fzf"
     "tmux"
     "stow"
+    "ripgrep"
 )
 
 declare -A git_packages
