@@ -117,6 +117,16 @@ return {
 			log_level = "debug",
 		})
 
+		lspconfig["ruff"].setup({
+			capabilities = capabilities,
+			on_attach = on_attach,
+			init_options = {
+				args = {
+					"--config=~/.config/ruff/project.toml",
+				},
+			},
+		})
+
 		-- configure lua server (with special settings)
 		lspconfig["lua_ls"].setup({
 			capabilities = capabilities,
