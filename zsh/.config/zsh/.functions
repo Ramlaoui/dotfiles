@@ -299,3 +299,11 @@ function rsync () {
 
     command rsync "$@"
 }
+
+function rsyncgit () {
+    if [ -f "$XDG_CONFIG_HOME/rsync/.rsync.exclude" ]; then
+        set -- --exclude-from="$XDG_CONFIG_HOME/rsync/.rsync.exclude" --filter=':- .gitignore' "$@"
+    fi
+
+    command rsync "$@"
+}
