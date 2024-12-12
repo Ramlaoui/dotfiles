@@ -43,6 +43,7 @@ git_packages=(
     ["fzf"]="https://github.com/junegunn/fzf fzf"
     ["tmux"]="https://github.com/tmux/tmux autotools"
     ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
+    ["ripgrep"]="https://github.com/BurntSushi/ripgrep rust"
 )
 
 # Parse command-line options
@@ -252,6 +253,10 @@ function install_from_git() {
         perl Makefile.PL PREFIX="$HOME/.local"
         make -j"$(nproc)"
         make install
+        ;;
+    ripgrep)
+        curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb
+        dpkg -i ripgrep_14.1.0-1_amd64.deb
         ;;
     *)
         echo -e "${YELLOW}Unknown build type: $build_type${RESET}"
