@@ -117,7 +117,7 @@ M = {
 		),
 		{
 			condition = function(line_to_cursor, matched_trigger, captures)
-				return M.in_text() and line_begin(line_to_cursor, matched_trigger, captures)
+				return tex.in_text() and line_begin(line_to_cursor, matched_trigger, captures)
 			end,
 		}
 	),
@@ -144,7 +144,7 @@ M = {
 		),
 		{
 			condition = function(line_to_cursor, matched_trigger, captures)
-				return M.in_text() and line_begin(line_to_cursor, matched_trigger, captures)
+				return tex.in_text() and line_begin(line_to_cursor, matched_trigger, captures)
 			end,
 		}
 	),
