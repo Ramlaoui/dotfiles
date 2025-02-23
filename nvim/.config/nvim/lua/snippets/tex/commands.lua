@@ -165,15 +165,6 @@ end
 vim.list_extend(M, text_format_snippets)
 
 local single_command_specs = {
-	sec = {
-		context = {
-			name = "section",
-			dscr = "section",
-			priority = 250,
-		},
-		command = [[\section]],
-		ext = { label = true, short = "sec" },
-	},
 	ssec = {
 		context = {
 			name = "subsection",
@@ -190,15 +181,6 @@ local single_command_specs = {
 		},
 		command = [[\subsubsection]],
 		ext = { label = true, short = "sssec" },
-	},
-	["sec*"] = {
-		context = {
-			name = "section*",
-			dscr = "section*",
-			priority = 250,
-		},
-		command = [[\section*]],
-		ext = { label = true, short = "sec" },
 	},
 	["ssec*"] = {
 		context = {

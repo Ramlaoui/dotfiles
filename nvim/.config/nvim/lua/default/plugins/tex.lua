@@ -25,17 +25,55 @@ return {
 
 		vim.g["vimtex_context_pdf_viewer"] = "sioyek"
 
-		vim.g.vimtex_compiler_latexmk = {
-			options = {
-				"-verbose",
-				"-pdflatex=lualatex",
-				"-file-line-error",
-				"-synctex=1",
-				"-interaction=nonstopmode",
-				"-shell-escape",
-				-- "-outdir=build",
-			},
+		-- Define two sets of compiler options:
+		-- 1. Default options (typically use pdflatex)
+		local default_compiler_options = {
+			"-verbose",
+			"-file-line-error",
+			"-synctex=1",
+			"-interaction=nonstopmode",
+			"-shell-escape",
 		}
+		-- 2. Options for lualatex (adds the -pdflatex=lualatex flag)
+		local lualatex_compiler_options = {
+			"-verbose",
+			"-pdflatex=lualatex",
+			"-file-line-error",
+			"-synctex=1",
+			"-interaction=nonstopmode",
+			"-shell-escape",
+		}
+
+		-- (Optional) Set the global compiler options to the default ones.
+		vim.g.vimtex_compiler_latexmk = { options = default_compiler_options }
+
+		-- Helper function to compile using the default compiler (pdfLaTeX)
+		local function compile_default()
+			vim.g.vimtex_compiler_latexmk.options = default_compiler_options
+			vim.cmd("VimtexCompile")
+		end
+
+		-- Helper function to compile using lualatex
+		local function compile_lualatex()
+			vim.g.vimtex_compiler_latexmk.options = lualatex_compiler_options
+			vim.cmd("VimtexCompile")
+		end
+
+		-- Map a key for default compilation
+		vim.api.nvim_set_keymap(
+			"n",
+			"<localleader>lcd",
+			"<cmd>lua compile_default()<CR>",
+			{ noremap = true, silent = true, desc = "Compile with default pdflatex" }
+		)
+
+		-- Map a key for lualatex compilation
+		vim.api.nvim_set_keymap(
+			"n",
+			"<localleader>lcl",
+			"<cmd>lua compile_lualatex()<CR>",
+			{ noremap = true, silent = true, desc = "Compile with lualatex" }
+		)
 
 		-- vim.g['vimtex_complete_enabled'] = 1
 		-- vim.g['vimtex_compiler_progname'] = 'nvr'
