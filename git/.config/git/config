@@ -1,0 +1,4 @@
+[include]
+    path = ~/.config/git/config_public
+[include]
+    path = ~/.config/git/config_private

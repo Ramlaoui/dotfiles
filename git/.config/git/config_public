@@ -1,0 +1,33 @@
+[credential]
+    helper = cache
+[init]
+    defaultBranch = main
+[core]
+    editor = nvim
+    excludesfile = ~/.config/git/.gitignore_global
+    pager = delta
+[push]
+    default = simple
+[merge]
+    tool = nvim
+    conflictstyle = diff3
+    prompt = false
+[mergetools "nvim"]
+    cmd = "nvim -f -c \"Gdiffsplit!\" \"$MERGED\""
+[alias]
+    graphgpg = log --graph --color --pretty=format:"%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%C(blue)%x20(%ce)%x20%C(cyan)[gpg:%GK%x20%G?]%C(reset)%n%x20%s%n"
+	graph = log --graph --color --pretty=format:"%C(yellow)%H%C(green)%d%C(reset)%n%x20%cd%n%x20%cn%C(blue)%x20(%ce)%x20%C(cyan)%C(reset)%n%x20%s%n"
+    unstage = reset HEAD --
+    wip = for-each-ref --sort='authordate:iso8601' --format=' %(color:green)%(authordate:relative)%09%(color:white)%(refname:short)' refs/heads
+[init]
+	defaultBranch = main
+[color]
+    ui = auto
+[interactive]
+    diffFilter = delta --color-only
+[delta]
+    navigate = true    # use n and N to move between diff sections
+[merge]
+    conflictstyle = zdiff3
+[commit]
+	gpgSign = true
