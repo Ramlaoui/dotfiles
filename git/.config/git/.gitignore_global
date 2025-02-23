@@ -7,3 +7,15 @@ venv
 node_modules
 
 *rsa*
+
+# Latex build files
+build/
+*.aux
+*.log
+*.out
+*.pdf
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.gz
