@@ -57,6 +57,29 @@ function codessh() {
     fi
 }
 
+function curssh() {
+    if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+        echo "Usage: vssh <user@host> '[remote_directory]'"
+        return 1
+    fi
+
+    local host=$1
+    local dir=${2:-}
+
+    if [ -z "$dir" ]; then
+        #Resolve directory:
+        dir=$(ssh "$host" 'cd ~ && pwd')
+        # Connect to the SSH server without specifying a directory
+        cursor --remote ssh-remote+"$host" "$dir"
+    else
+        # Resolve directory:
+        new_dir=$(ssh "$host" "cd ~ && pwd")
+        new_dir="$new_dir/$dir"
+        # Connect to the SSH server and open the specified directory
+        cursor --remote ssh-remote+"$host" "$new_dir"
+    fi
+}
+
 # File functions
 function tmpclean() {
     cd $TMPDIR
