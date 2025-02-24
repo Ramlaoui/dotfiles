@@ -150,7 +150,7 @@ function install_go() {
         GO_VERSION="1.21.1"
         wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
         tar -C "$HOME" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
-        mv "$HOME/go/bin/**" "$HOME/.local/bin"
+        mv $HOME/go/bin/** "$HOME/.local/bin"
         rm -rf "$HOME/go"
     fi
 }
