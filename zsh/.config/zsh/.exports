@@ -28,9 +28,6 @@ export PYTHONBREAKPOINT=ipdb.set_trace
 export GOPATH="$HOME/go"
 export PATH="$GOPATH/bin:$PATH"
 
-# XTerm
-export DISPLAY=:0
-
 # Folders
 export ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 export ADMIN="$ICLOUD/admin"
