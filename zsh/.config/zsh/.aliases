@@ -9,6 +9,7 @@ alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid 
 alias inkscape-watch="inkscape-figures watch"
 
 # General
+alias kilast='kill -9 %%' # Kill last background process
 
 # Find + manage aliases
 alias al='alias | less' # List all aliases
@@ -21,7 +22,9 @@ alias pa='pbpaste'        # Paste clipboard contents
 
 # Finding files and directories
 alias dud='du -d 1 -h'                                  # List sizes of files within directory
+alias duds='du -d 1 -h | sort -h'                                  # List sizes of files within directory
 alias duf='du -sh *'                                    # List total size of current directory
+alias dufs='du -sh * | sort -h'                                    # List total size of current directory
 alias ff='find . -type f -name'                         # Find a file by name within current directory
 (($+commands[fd])) || alias fd='find . -type d -name' # Find direcroy by name
 
