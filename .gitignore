@@ -2,3 +2,4 @@ dotty
 .zshrc.local
 lazy-lock.json
 *private*
+.sqlite
