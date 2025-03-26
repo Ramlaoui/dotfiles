@@ -29,5 +29,25 @@ The structure of the repository is as follows:
 Tree structure of the repository:
 
 ```bash
-
+.
+├── git/                  # Git configuration
+├── install.sh            # Main installation script
+├── macos/                # macOS specific configurations
+├── nvim/                 # Neovim configuration
+│   └── .config/
+│       └── nvim/
+├── python/               # Python environment setup
+├── README.md             # This documentation
+├── scripts/              # Installation and setup scripts
+│   ├── installs/         # Dependency installation scripts
+│   ├── linux/            # Linux-specific scripts
+│   └── macos/            # macOS-specific scripts
+├── tmux/                 # Tmux configuration
+├── todo.md               # Planned improvements
+└── zsh/                  # Zsh shell configuration
+    ├── .config/
+    ├── .inputrc
+    ├── .zpreztorc
+    ├── .zshrc
+    └── .zshrc.local
 ```

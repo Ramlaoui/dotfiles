@@ -3,3 +3,4 @@ dotty
 lazy-lock.json
 *private*
 .sqlite
+.DS_Store
