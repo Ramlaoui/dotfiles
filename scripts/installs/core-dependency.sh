@@ -276,7 +276,8 @@ function build_neovim_from_source() {
     fi
     
     make CMAKE_BUILD_TYPE=Release -j"$(nproc)"
-    make install PREFIX="$HOME/.local"
+    make CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$HOME/.local/neovim"
+    make install
 }
 
 function install_go() {
