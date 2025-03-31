@@ -272,7 +272,7 @@ setup_neovim() {
                 ;;
             Linux)
                 # Try appimage for Linux
-                if curl -fsSL -o "$nvim_bin/nvim" https://github.com/neovim/neovim/releases/latest/download/nvim.appimage; then
+                if curl -fsSL -o "$nvim_bin/nvim" https://github.com/neovim/neovim/releases/download/stable/nvim-linux-arm64.appimage; then
                     chmod u+x "$nvim_bin/nvim"
                     log_success "Neovim AppImage installed successfully"
                 else
