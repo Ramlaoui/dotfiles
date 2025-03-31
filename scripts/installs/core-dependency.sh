@@ -30,6 +30,12 @@ core_packages=(
     "ripgrep"
 )
 
+# Packages that should always be built from source
+always_build_from_source=(
+    "tmux"
+    "fzf"
+)
+
 # Additional dependencies for specific packages
 declare -A package_deps
 package_deps=(
