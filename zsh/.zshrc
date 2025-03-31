@@ -35,11 +35,6 @@ zle -N zle-keymap-select
 # Source fzf if command fzf succeeds
 command -v fzf >/dev/null && source <(fzf --zsh)
 
-# Swap Caps Lock and Escape (for linux systems
-if [[ $(uname) == "Linux" ]]; then
-  setxkbmap -option caps:swapescape
-fi
-
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
 
 

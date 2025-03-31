@@ -69,11 +69,6 @@ if [ -f "$HOME/Downloads/google-cloud-sdk/completion.bash.inc" ]; then
     source "$HOME/Downloads/google-cloud-sdk/completion.bash.inc"
 fi
 
-# Swap Caps Lock and Escape (for Linux systems)
-if [[ $(uname) == "Linux" ]]; then
-  setxkbmap -option caps:swapescape
-fi
-
 # Add node to PATH
 export PATH=$XDG_DATA_HOME/node/bin:$PATH
 
