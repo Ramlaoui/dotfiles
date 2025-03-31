@@ -172,6 +172,54 @@ else
     log_warning "Skipping dependency installation. Some features may not work."
 fi
 
+# Install tmux from source
+install_tmux() {
+    if command -v tmux >/dev/null; then
+        log_success "tmux is already installed"
+        return 0
+    fi
+
+    log_info "Installing tmux from source..."
+    
+    # Create temporary directory for tmux installation
+    local tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+    
+    # Download tmux
+    if curl -L https://github.com/tmux/tmux/releases/download/3.5a/tmux-3.5a.tar.gz -o tmux-3.5a.tar.gz; then
+        log_success "Downloaded tmux source"
+    else
+        log_error "Failed to download tmux source"
+        cd - > /dev/null
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+    
+    # Extract and build
+    if tar xf tmux-3.5a.tar.gz && cd tmux-3.5a; then
+        if ./configure && make; then
+            if sudo make install; then
+                log_success "tmux installed successfully"
+                cd - > /dev/null
+                rm -rf "$tmp_dir"
+                return 0
+            else
+                log_error "Failed to install tmux"
+            fi
+        else
+            log_error "Failed to build tmux"
+        fi
+    else
+        log_error "Failed to extract tmux source"
+    fi
+    
+    cd - > /dev/null
+    rm -rf "$tmp_dir"
+    return 1
+}
+
+install_tmux || log_warning "tmux installation failed, you can install it manually later"
+
 # Setup tmux with better prompting and error handling
 if [ "$INSTALL_TMUX_PLUGINS" != true ]; then
     read -p "Do you want to install tmux plugins? This will remove the current tmux configuration [y/n] " -n 1 -r
