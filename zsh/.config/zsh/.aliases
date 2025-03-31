@@ -26,11 +26,11 @@ alias duds='du -d 1 -h | sort -h'                                  # List sizes 
 alias duf='du -sh *'                                    # List total size of current directory
 alias dufs='du -sh * | sort -h'                                    # List total size of current directory
 alias ff='find . -type f -name'                         # Find a file by name within current directory
-(($+commands[fd])) || alias fd='find . -type d -name' # Find direcroy by name
+command -v fd >/dev/null 2>&1 || alias fd='find . -type d -name' # Find directory by name
 
 # Displaying files
-(($+commands[bat])) && alias cat='bat'    # Use bat instead of cat
-(($+commands[eza])) && alias ls='eza -la' # Use exa instead of ls
+command -v bat >/dev/null 2>&1 && alias cat='bat'    # Use bat instead of cat
+command -v eza >/dev/null 2>&1 && alias ls='eza -la' # Use exa instead of ls
 
 # External Services
 alias myip='curl ipv4.icanhazip.com'
