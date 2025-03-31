@@ -14,6 +14,7 @@ RESET='\033[0m'
 core_packages=(
     "git"
     "curl"
+    "cmake"
     "python3-venv"
     "nvim"
     "fd-find"
@@ -40,6 +41,7 @@ always_build_from_source=(
 declare -A package_deps
 package_deps=(
     ["tmux"]="libevent-dev ncurses-dev build-essential bison pkg-config"
+    ["nvim"]="cmake ninja-build gettext unzip curl build-essential"
 )
 
 declare -A git_packages
@@ -170,6 +172,113 @@ function multi_system_install() {
     fi
 }
 
+# Specialized Neovim installation function for different platforms
+function install_neovim() {
+    echo -e "${PURPLE}Installing Neovim${RESET}"
+    
+    local nvim_bin="$HOME/.local/bin"
+    mkdir -p "$nvim_bin"
+    
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &>/dev/null; then
+                brew install neovim
+                echo -e "${PURPLE}Neovim installed via Homebrew${RESET}"
+            else
+                # Use source installation for Mac without Homebrew
+                echo -e "${PURPLE}Building Neovim from source${RESET}"
+                BUILD_DIR="$HOME/build/nvim"
+                mkdir -p "$BUILD_DIR"
+                cd "$BUILD_DIR" || exit 1
+                
+                if [ ! -d "${BUILD_DIR}/neovim" ]; then
+                    git clone https://github.com/neovim/neovim
+                    cd neovim || exit 1
+                else
+                    cd neovim || exit 1
+                    git pull
+                fi
+                
+                make CMAKE_BUILD_TYPE=Release -j"$(sysctl -n hw.ncpu)"
+                make install PREFIX="$HOME/.local"
+            fi
+            ;;
+        Linux)
+            if [ "$USE_SUDO" = true ]; then
+                # Try to use package manager first
+                if [ -f "/etc/arch-release" ]; then
+                    sudo pacman -S --noconfirm neovim
+                elif [ -f "/etc/debian_version" ]; then
+                    sudo apt-get update -y
+                    sudo apt-get install -y neovim
+                else
+                    # Try AppImage as fallback
+                    # Detect architecture
+                    ARCH=$(uname -m)
+                    if [ "$ARCH" = "x86_64" ]; then
+                        APP_IMAGE_ARCH="x86_64"
+                    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+                        APP_IMAGE_ARCH="arm64"
+                    else
+                        echo -e "${YELLOW}Unsupported architecture: $ARCH. Using source installation.${RESET}"
+                        build_neovim_from_source
+                        return
+                    fi
+                    
+                    if curl -fsSL -o "$nvim_bin/nvim" "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-$APP_IMAGE_ARCH.appimage"; then
+                        chmod u+x "$nvim_bin/nvim"
+                        echo -e "${PURPLE}Neovim AppImage installed successfully${RESET}"
+                    else
+                        echo -e "${YELLOW}AppImage download failed, falling back to source installation${RESET}"
+                        build_neovim_from_source
+                    fi
+                fi
+            else
+                # No sudo, use source installation
+                build_neovim_from_source
+            fi
+            ;;
+        *)
+            echo -e "${YELLOW}Unsupported operating system: $(uname -s), using source installation${RESET}"
+            build_neovim_from_source
+            ;;
+    esac
+    
+    # Ensure that nvim is in PATH
+    if command -v nvim &>/dev/null; then
+        echo -e "${PURPLE}Neovim installation completed successfully${RESET}"
+    else
+        echo -e "${YELLOW}Neovim installation may have failed, attempting to fix...${RESET}"
+        # Try to create symlinks to ensure nvim is in PATH
+        if [ -f "$HOME/.local/bin/nvim" ]; then
+            echo -e "${PURPLE}Creating symlink to nvim in PATH${RESET}"
+            ln -sf "$HOME/.local/bin/nvim" "$HOME/.local/bin/neovim"
+        elif [ -f "$HOME/.local/bin/neovim" ]; then
+            echo -e "${PURPLE}Creating symlink to neovim in PATH${RESET}"
+            ln -sf "$HOME/.local/bin/neovim" "$HOME/.local/bin/nvim"
+        fi
+    fi
+}
+
+# Helper function to build Neovim from source
+function build_neovim_from_source() {
+    echo -e "${PURPLE}Building Neovim from source${RESET}"
+    BUILD_DIR="$HOME/build/nvim"
+    mkdir -p "$BUILD_DIR"
+    cd "$BUILD_DIR" || exit 1
+
+    if [ ! -d "${BUILD_DIR}/neovim" ]; then
+        git clone https://github.com/neovim/neovim
+        cd neovim || exit 1
+    else
+        cd neovim || exit 1
+        git pull
+    fi
+    
+    make CMAKE_BUILD_TYPE=Release -j"$(nproc)"
+    make install PREFIX="$HOME/.local"
+}
+
 function install_go() {
     if ! command -v go &>/dev/null; then
         echo -e "${PURPLE}Installing Go${RESET}"
@@ -189,6 +298,12 @@ function install_from_git() {
     local package_name="$1"
     local repo_url="$2"
     local build_type="$3"
+
+    # Special case for nvim
+    if [ "$package_name" = "nvim" ]; then
+        install_neovim
+        return
+    fi
 
     echo -e "${PURPLE}Installing ${package_name} from source${RESET}"
 
@@ -243,6 +358,9 @@ function install_from_git() {
         mkdir -p "$HOME/.local/bin"
         go build -o "$HOME/.local/bin/$package_name"
         ;;
+    nvim)
+        install_neovim
+        ;;
     fzf)
         install_go
         echo -e "${PURPLE}Building fzf${RESET}"
@@ -259,17 +377,8 @@ function install_from_git() {
         sudo install lazygit "$HOME/.local/bin"
         ;;
     make)
-        #curl -O https://ftp.gnu.org/pub/gnu/gettext/gettext-0.22.5.tar.gz
-        #tar xvf gettext-0.22.5.tar.gz
-        #cd gettext-0.22.5/
-        #./configure --prefix="$HOME/.local"
-        #make
-        #make install
         make prefix="$HOME/.local" -j"$(nproc)"
         make install prefix="$HOME/.local"
-        ;;
-    nvim)
-        make CMAKE_INSTALL_PREFIX=$XDG_DATA_HOME/nvim install
         ;;
     perl)
         if ! command -v cpanm &>/dev/null; then

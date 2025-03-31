@@ -268,45 +268,19 @@ install_prezto || log_warning "Prezto installation failed, you can install it ma
 
 # Setup Neovim with better path handling
 setup_neovim() {
-    log_info "Setting up Neovim..."
+    log_info "Setting up Neovim environments..."
     
-    local nvim_bin="$HOME/.local/bin"
-    mkdir -p "$nvim_bin"
-    
-    if command -v nvim >/dev/null; then
-        log_success "Neovim is already installed"
-    else
-        log_info "Installing Neovim..."
-        
-        # System-specific installation
-        case "$(uname -s)" in
-            Darwin)
-                if command -v brew >/dev/null; then
-                    brew install neovim
-                else
-                    log_warning "Homebrew not found, can't install Neovim automatically on macOS"
-                    return 1
-                fi
-                ;;
-            Linux)
-                # Try appimage for Linux
-                if curl -fsSL -o "$nvim_bin/nvim" https://github.com/neovim/neovim/releases/download/stable/nvim-linux-arm64.appimage; then
-                    chmod u+x "$nvim_bin/nvim"
-                    log_success "Neovim AppImage installed successfully"
-                else
-                    log_error "Failed to download Neovim AppImage"
-                    return 1
-                fi
-                ;;
-            *)
-                log_error "Unsupported operating system: $(uname -s)"
-                return 1
-                ;;
-        esac
+    # Validate Neovim installation
+    if ! command -v nvim >/dev/null; then
+        log_warning "Neovim is not installed. Please install it first using core-dependency.sh."
+        return 1
     fi
+    
+    log_success "Using Neovim: $(which nvim) ($(nvim --version | head -n1))"
+    return 0
 }
 
-setup_neovim || log_warning "Neovim installation failed, you can install it manually later"
+setup_neovim || log_warning "Neovim validation failed, but continuing with environment setup..."
 
 # Create Python3 environment for Neovim with better error recovery
 setup_nvim_python() {
