@@ -175,8 +175,17 @@ fi
 # Install tmux from source
 install_tmux() {
     if command -v tmux >/dev/null; then
-        log_success "tmux is already installed"
-        return 0
+        # Get current tmux version
+        current_version=$(tmux -V | cut -d' ' -f2)
+        log_info "Current tmux version: $current_version"
+        
+        # Compare version numbers (3.5 or higher is good)
+        if [ "$(printf '%s\n' "3.5" "$current_version" | sort -V | head -n1)" = "3.5" ]; then
+            log_success "tmux version $current_version is sufficient"
+            return 0
+        else
+            log_warning "tmux version $current_version is older than 3.5, will upgrade"
+        fi
     fi
 
     log_info "Installing tmux from source..."
