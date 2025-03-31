@@ -177,8 +177,11 @@ function install_go() {
         wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
         tar -C "$HOME" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
         mv $HOME/go/bin/** "$HOME/.local/bin"
+        mv $HOME/go "$HOME/.local"
         rm -rf "$HOME/go"
+        export GOROOT="$HOME/.local/go"
     fi
+    export GOROOT="$HOME/.local/go"
 }
 
 # Function to install packages from Git repositories

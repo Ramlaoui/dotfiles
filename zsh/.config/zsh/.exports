@@ -25,7 +25,8 @@ export IPYTHONDIR="$XDG_CONFIG_HOME/ipython"
 export PYTHONBREAKPOINT=ipdb.set_trace
 
 # GO
-export GOPATH="$HOME/go"
+export GOPATH="$HOME/.local/go"
+export GOROOT="$HOME/.local/go"
 export PATH="$GOPATH/bin:$PATH"
 
 # Folders
