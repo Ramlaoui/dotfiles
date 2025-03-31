@@ -33,7 +33,7 @@ core_packages=(
 # Additional dependencies for specific packages
 declare -A package_deps
 package_deps=(
-    ["tmux"]="libevent-dev ncurses-dev build-essential bison pkg-config"
+    ["tmux"]="libevent-dev ncurses-dev bison pkg-config"
 )
 
 declare -A git_packages
@@ -309,7 +309,12 @@ for app in "${core_packages[@]}"; do
             if [ "$(printf '%s\n' "3.5" "$current_version" | sort -V | head -n1)" != "3.5" ]; then
                 echo -e "${YELLOW}${app} version $current_version is older than 3.5. Upgrading...${RESET}"
                 install_package_deps "$app"
-                multi_system_install "$app"
+                if [ -n "${git_packages[$app]}" ]; then
+                    IFS=' ' read -r repo_url build_type <<<"${git_packages[$app]}"
+                    install_from_git "$app" "$repo_url" "$build_type"
+                else
+                    multi_system_install "$app"
+                fi
             else
                 echo -e "${YELLOW}${app} version $current_version is sufficient. Skipping.${RESET}"
             fi
