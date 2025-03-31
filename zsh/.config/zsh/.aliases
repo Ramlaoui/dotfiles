@@ -16,9 +16,9 @@ alias al='alias | less' # List all aliases
 alias as='alias | grep' # Search aliases
 alias ar='unalias'      # Remove given alias
 
-# Copy / pasting
-alias cpwd='pwd | pbcopy' # Copy current path
-alias pa='pbpaste'        # Paste clipboard contents
+# Copy/paste
+alias cpwd='pwd | pbcopy'
+alias pa='pbpaste'
 
 # Finding files and directories
 alias dud='du -d 1 -h'                                  # List sizes of files within directory
@@ -40,8 +40,6 @@ alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 
 # orgmode
 alias notes="nvim ~/org/refile.org"
-# alias org="nvim ~/org"
-# fzf to search notes
 
 # SSH
 alias ssconfig="nvim ~/.ssh/config"

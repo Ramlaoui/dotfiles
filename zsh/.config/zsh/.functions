@@ -1,4 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
+
+# Zsh-specific functions
 
 # SSH Functions
 function ssh_server() {
@@ -21,7 +23,6 @@ function ssh_server() {
     if [ -z "$server_key" ]; then
         server_key=~/.ssh/id_rsa
     fi
-
 
     echo "" >> ~/.ssh/config
     echo "Host $server_name" >> ~/.ssh/config
@@ -86,6 +87,29 @@ function tmpclean() {
     rm -rf *
 }
 
+# Copy current directory path
+function copy_pwd() {
+    pwd | pbcopy
+}
+
+# Edit configuration files
+function editrc() {
+    nvim ~/.zshrc
+}
+
+function latexsnippets() {
+    nvim ~/.config/nvim/my_snippets/tex.snippets
+}
+
+function nvimconfig() {
+    cd ~/.config/nvim
+}
+
+function tmuxconfig() {
+    nvim ~/.config/tmux/.tmux.conf
+}
+
+# File functions
 function mkcd() {
     mkdir -p "$1" && cd "$1"
 }
@@ -300,14 +324,6 @@ function tresizeup() {
 
 function tresizedown() {
   tmux resize-pane -D "$@"
-}
-
-function tresizeup() {
-  tmux resize-pane -U "$@"
-}
-
-function tresizeleft() {
-  tmux resize-pane -L "$@"
 }
 
 function tresizeright() {

@@ -44,3 +44,9 @@ export PATH=$XDG_DATA_HOME/node/bin:$PATH
 
 
 . "$HOME/.local/share/../bin/env"
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/aliramlaoui/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
