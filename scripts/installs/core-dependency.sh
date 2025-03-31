@@ -55,22 +55,27 @@ git_packages=(
 # Parse command-line options
 USE_SUDO=true
 AUTO_YES=false
+SHOW_HELP=false
+SPECIFIC_PACKAGES=()
 
 for arg in "$@"; do
     case $arg in
     --no-sudo)
         USE_SUDO=false
-        shift
         ;;
     --auto-yes)
         AUTO_YES=true
-        shift
         ;;
     --help)
         SHOW_HELP=true
-        shift
         ;;
-    *) ;;
+    --*)
+        # Skip other options
+        ;;
+    *)
+        # Collect non-option arguments as specific packages to install
+        SPECIFIC_PACKAGES+=("$arg")
+        ;;
     esac
 done
 
@@ -79,10 +84,14 @@ function print_usage() {
     echo -e "${PURPLE}Prerequisite Dependency Installation Script${LIGHT}\n" \
         "This script installs necessary packages for setting up dotfiles.\n" \
         "It detects the OS and uses the appropriate package manager or installs from source.\n" \
+        "Usage:\n" \
+        "  ./core-dependency.sh [options] [package1 package2 ...]\n" \
         "Options:\n" \
         "  --no-sudo    Install packages from source without using sudo.\n" \
         "  --auto-yes   Automatically agree to prompts.\n" \
-        "  --help       Show this help message and exit.\n${RESET}"
+        "  --help       Show this help message and exit.\n" \
+        "If no packages are specified, all core packages will be installed.\n" \
+        "Available packages: ${core_packages[*]}\n${RESET}"
 }
 
 # Show help menu if requested
@@ -91,9 +100,14 @@ if [ "$SHOW_HELP" = true ]; then
     exit 0
 fi
 
+# If SPECIFIC_PACKAGES is empty, use all core_packages
+if [ ${#SPECIFIC_PACKAGES[@]} -eq 0 ]; then
+    SPECIFIC_PACKAGES=("${core_packages[@]}")
+fi
+
 # Prompt user to continue
 if [ "$AUTO_YES" = false ]; then
-    echo -e "${PURPLE}Are you happy to continue? (y/N)${RESET}"
+    echo -e "${PURPLE}Installing the following packages: ${SPECIFIC_PACKAGES[*]}\nAre you happy to continue? (y/N)${RESET}"
     read -r -n 1 -t 15 REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -288,8 +302,26 @@ function install_package_deps() {
     fi
 }
 
+# Function to check if package is in the core_packages list
+function is_valid_package() {
+    local package="$1"
+    for core_package in "${core_packages[@]}"; do
+        if [ "$package" = "$core_package" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Validate the specified packages
+for package in "${SPECIFIC_PACKAGES[@]}"; do
+    if ! is_valid_package "$package"; then
+        echo -e "${YELLOW}Warning: '$package' is not in the list of core packages. It might not install correctly.${RESET}"
+    fi
+done
+
 # Main installation logic
-for app in "${core_packages[@]}"; do
+for app in "${SPECIFIC_PACKAGES[@]}"; do
     if ! command -v "$app" &>/dev/null; then
         # Check if package should always be built from source
         should_build_from_source=false

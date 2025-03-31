@@ -21,11 +21,12 @@ CORE_DEPENDENCY_ARGS=()
 INSTALL_TMUX_PLUGINS=false
 SKIP_SHELL_CHANGE=false
 VERBOSE=false
+SPECIFIC_PACKAGES=()
 
 # Function to display usage help
 show_help() {
     cat << EOF
-Usage: $0 [options]
+Usage: $0 [options] [package1 package2 ...]
 
 Options:
   --stow-only       Only apply 'stow' to the folders, skip dependencies installation
@@ -34,6 +35,9 @@ Options:
   --skip-shell      Skip changing the default shell to zsh
   --verbose         Show verbose output
   -h, --help        Show this help message and exit
+
+You can specify specific packages to install after all options.
+Available packages: git curl python3-venv nvim fd-find git-delta lazygit bat eza tldr zsh htop fzf tmux stow ripgrep
 EOF
 }
 
@@ -67,10 +71,15 @@ while [[ $# -gt 0 ]]; do
         show_help
         exit 0
         ;;
-    *)
+    --*)
         log_error "Unknown option: $1"
         show_help
         exit 1
+        ;;
+    *)
+        # Collect non-option arguments as specific packages to install
+        SPECIFIC_PACKAGES+=("$1")
+        shift
         ;;
     esac
 done
@@ -163,10 +172,19 @@ fi
 # Install core dependencies with better error handling
 log_info "Installing core dependencies..."
 if [ -f "./scripts/installs/core-dependency.sh" ]; then
-    ./scripts/installs/core-dependency.sh "${CORE_DEPENDENCY_ARGS[@]}" || {
-        log_error "Failed to install core dependencies."
-        log_warning "You can still use your dotfiles, but some features may not work."
-    }
+    # If specific packages were specified, add them to the command
+    if [ ${#SPECIFIC_PACKAGES[@]} -gt 0 ]; then
+        log_info "Installing specific packages: ${SPECIFIC_PACKAGES[*]}"
+        ./scripts/installs/core-dependency.sh "${CORE_DEPENDENCY_ARGS[@]}" "${SPECIFIC_PACKAGES[@]}" || {
+            log_error "Failed to install core dependencies."
+            log_warning "You can still use your dotfiles, but some features may not work."
+        }
+    else
+        ./scripts/installs/core-dependency.sh "${CORE_DEPENDENCY_ARGS[@]}" || {
+            log_error "Failed to install core dependencies."
+            log_warning "You can still use your dotfiles, but some features may not work."
+        }
+    fi
 else
     log_error "Core dependency script not found at ./scripts/installs/core-dependency.sh"
     log_warning "Skipping dependency installation. Some features may not work."
