@@ -27,7 +27,5 @@
     diffFilter = delta --color-only
 [delta]
     navigate = true    # use n and N to move between diff sections
-[merge]
-    conflictstyle = zdiff3
 [commit]
 	gpgSign = true
