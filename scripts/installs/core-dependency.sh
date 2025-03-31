@@ -10,6 +10,22 @@ YELLOW='\033[0;93m'
 LIGHT='\x1b[2m'
 RESET='\033[0m'
 
+# Setup environment variables
+# Base paths
+export PATH="$HOME/.local/bin:$PATH"
+
+# Go environment setup
+if [ -d "$HOME/.local/go" ]; then
+    export GOROOT="$HOME/.local/go"
+    export GOPATH="$HOME/.local/gopath"
+    export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+fi
+
+# Rust environment setup
+if [ -d "$HOME/.cargo" ]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
 # Package lists
 core_packages=(
     "git"
@@ -113,9 +129,6 @@ if ! command -v sudo &>/dev/null; then
     USE_SUDO=false
 fi
 
-# Update PATH for local installations
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/go/bin:$PATH"
-
 # Installation functions
 function install_debian() {
     echo -e "${PURPLE}Installing ${1} via apt-get${RESET}"
@@ -160,10 +173,59 @@ function install_go() {
     if ! command -v go &>/dev/null; then
         echo -e "${PURPLE}Installing Go${RESET}"
         GO_VERSION="1.21.1"
-        wget "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
-        tar -C "$HOME" -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
-        mv $HOME/go/bin/** "$HOME/.local/bin"
-        rm -rf "$HOME/go"
+        
+        # Determine architecture and OS for correct Go download
+        local arch
+        local os_type
+        
+        if [ "$(uname -s)" = "Darwin" ]; then
+            os_type="darwin"
+            if [ "$(uname -m)" = "arm64" ]; then
+                arch="arm64"
+            else
+                arch="amd64"
+            fi
+        else
+            os_type="linux"
+            arch="amd64"
+        fi
+        
+        echo -e "${YELLOW}Downloading Go ${GO_VERSION} for ${os_type}-${arch}${RESET}"
+        wget "https://go.dev/dl/go${GO_VERSION}.${os_type}-${arch}.tar.gz"
+        
+        # Clean up existing Go installation if it exists
+        rm -rf "$HOME/.local/go"
+        
+        # Extract Go to .local directory
+        mkdir -p "$HOME/.local"
+        tar -C "$HOME/.local" -xzf "go${GO_VERSION}.${os_type}-${arch}.tar.gz"
+        rm -f "go${GO_VERSION}.${os_type}-${arch}.tar.gz"
+        
+        # Create symlink to Go binaries
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$HOME/.local/go/bin/"* "$HOME/.local/bin/"
+        
+        # Set up Go environment variables
+        export GOROOT="$HOME/.local/go"
+        export GOPATH="$HOME/.local/gopath"
+        export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+        
+        # Create GOPATH directories
+        mkdir -p "$GOPATH/src" "$GOPATH/bin" "$GOPATH/pkg"
+        
+        echo -e "${PURPLE}Go ${GO_VERSION} installed successfully${RESET}"
+        echo -e "${YELLOW}GOROOT set to $GOROOT${RESET}"
+        echo -e "${YELLOW}GOPATH set to $GOPATH${RESET}"
+    else
+        # Even if Go is installed, ensure GOROOT and GOPATH are set
+        if [ -d "$HOME/.local/go" ]; then
+            export GOROOT="$HOME/.local/go"
+            export GOPATH="$HOME/.local/gopath"
+            export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+            echo -e "${YELLOW}Using existing Go installation${RESET}"
+            echo -e "${YELLOW}GOROOT set to $GOROOT${RESET}"
+            echo -e "${YELLOW}GOPATH set to $GOPATH${RESET}"
+        fi
     fi
 }
 
@@ -229,8 +291,30 @@ function install_from_git() {
     fzf)
         install_go
         echo -e "${PURPLE}Building fzf${RESET}"
-        make
-        make install
+        
+        # Ensure GOROOT and GOPATH are set for build
+        if [ -n "$GOROOT" ] && [ -n "$GOPATH" ]; then
+            echo -e "${YELLOW}Using GOROOT=$GOROOT and GOPATH=$GOPATH${RESET}"
+        else
+            # Set them explicitly if not already set by install_go
+            export GOROOT="$HOME/.local/go"
+            export GOPATH="$HOME/.local/gopath"
+            export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+            echo -e "${YELLOW}Setting GOROOT=$GOROOT and GOPATH=$GOPATH${RESET}"
+        fi
+        
+        # Check if go command is available
+        if ! "$GOROOT/bin/go" version &>/dev/null; then
+            echo -e "${YELLOW}Go is not properly installed. Attempting to fix...${RESET}"
+            install_go
+        fi
+        
+        # Use the full path to go binary
+        export GO="$GOROOT/bin/go"
+        
+        # Build fzf using the specified go binary
+        GOROOT="$GOROOT" GOPATH="$GOPATH" make
+        
         echo -e "${PURPLE}Installing fzf into $HOME/.local/bin${RESET}"
         mkdir -p "$HOME/.local/bin"
         cp bin/* "$HOME/.local/bin/"
