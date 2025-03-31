@@ -30,10 +30,16 @@ core_packages=(
     "ripgrep"
 )
 
+# Packages that should always be built from source
+always_build_from_source=(
+    "tmux"
+    "fzf"
+)
+
 # Additional dependencies for specific packages
 declare -A package_deps
 package_deps=(
-    ["tmux"]="libevent-dev ncurses-dev bison pkg-config"
+    ["tmux"]="libevent-dev ncurses-dev build-essential bison pkg-config"
 )
 
 declare -A git_packages
@@ -46,7 +52,7 @@ git_packages=(
     ["bat"]="https://github.com/sharkdp/bat rust"
     ["zsh"]="https://github.com/zsh-users/zsh autotools"
     ["htop"]="https://github.com/htop-dev/htop autotools"
-    ["fzf"]="https://github.com/junegunn/fzf fzf"
+    ["fzf"]="https://github.com/junegunn/fzf.git fzf"
     ["tmux"]="https://github.com/tmux/tmux autotools"
     ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
     ["ripgrep"]="https://github.com/BurntSushi/ripgrep rust"
@@ -291,16 +297,25 @@ function install_package_deps() {
 # Main installation logic
 for app in "${core_packages[@]}"; do
     if ! command -v "$app" &>/dev/null; then
-        if [ "$USE_SUDO" = true ]; then
-            install_package_deps "$app"
-            multi_system_install "$app"
-        else
+        # Check if package should always be built from source
+        should_build_from_source=false
+        for build_pkg in "${always_build_from_source[@]}"; do
+            if [ "$app" = "$build_pkg" ]; then
+                should_build_from_source=true
+                break
+            fi
+        done
+
+        if [ "$should_build_from_source" = true ] || [ "$USE_SUDO" = false ]; then
             if [ -n "${git_packages[$app]}" ]; then
                 IFS=' ' read -r repo_url build_type <<<"${git_packages[$app]}"
                 install_from_git "$app" "$repo_url" "$build_type"
             else
                 echo -e "${YELLOW}No installation method for $app without sudo. Skipping.${RESET}"
             fi
+        else
+            install_package_deps "$app"
+            multi_system_install "$app"
         fi
     else
         # Check version for specific packages
