@@ -151,7 +151,7 @@ stow_config() {
 
 # Apply stow to dotfiles
 log_info "Applying stow to dotfiles..."
-for pkg in zsh tmux nvim git python; do
+for pkg in zsh tmux nvim git python bash; do
     stow_config "$pkg"
 done
 
