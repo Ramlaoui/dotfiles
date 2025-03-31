@@ -30,6 +30,12 @@ core_packages=(
     "ripgrep"
 )
 
+# Additional dependencies for specific packages
+declare -A package_deps
+package_deps=(
+    ["tmux"]="libevent-dev ncurses-dev build-essential bison pkg-config"
+)
+
 declare -A git_packages
 git_packages=(
     ["git"]="https://github.com/git/git make"
@@ -267,10 +273,26 @@ function install_from_git() {
     cd "$HOME" || exit 1
 }
 
+# Function to install package dependencies
+function install_package_deps() {
+    local package="$1"
+    if [ -n "${package_deps[$package]}" ]; then
+        echo -e "${PURPLE}Installing dependencies for ${package}${RESET}"
+        if [ "$(uname -s)" = "Darwin" ]; then
+            brew install "${package_deps[$package]}"
+        elif [ -f "/etc/arch-release" ]; then
+            sudo pacman -S --noconfirm "${package_deps[$package]}"
+        elif [ -f "/etc/debian_version" ]; then
+            sudo apt-get install -y "${package_deps[$package]}"
+        fi
+    fi
+}
+
 # Main installation logic
 for app in "${core_packages[@]}"; do
     if ! command -v "$app" &>/dev/null; then
         if [ "$USE_SUDO" = true ]; then
+            install_package_deps "$app"
             multi_system_install "$app"
         else
             if [ -n "${git_packages[$app]}" ]; then
@@ -281,7 +303,19 @@ for app in "${core_packages[@]}"; do
             fi
         fi
     else
-        echo -e "${YELLOW}${app} is already installed. Skipping.${RESET}"
+        # Check version for specific packages
+        if [ "$app" = "tmux" ]; then
+            current_version=$(tmux -V | cut -d' ' -f2)
+            if [ "$(printf '%s\n' "3.5" "$current_version" | sort -V | head -n1)" != "3.5" ]; then
+                echo -e "${YELLOW}${app} version $current_version is older than 3.5. Upgrading...${RESET}"
+                install_package_deps "$app"
+                multi_system_install "$app"
+            else
+                echo -e "${YELLOW}${app} version $current_version is sufficient. Skipping.${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}${app} is already installed. Skipping.${RESET}"
+        fi
     fi
 done
 
