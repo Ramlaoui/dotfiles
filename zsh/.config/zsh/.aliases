@@ -8,8 +8,12 @@ alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid 
 # inkscape watch
 alias inkscape-watch="inkscape-figures watch"
 
+# Watch directory changes (bash-specific syntax)
+alias wdir="watch -d -n 1 'ls -lah --color=auto'"
+
 # General
 alias kilast='kill -9 %%' # Kill last background process
+alias sourcesh='source ~/.zshrc' # Reload zshrc
 
 # Find + manage aliases
 alias al='alias | less' # List all aliases
