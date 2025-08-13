@@ -4,5 +4,5 @@ lazy-lock.json
 *private*
 *secrets*
 *local*
-.sqlite
+*.sqlite
 .DS_Store
