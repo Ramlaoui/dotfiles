@@ -117,6 +117,17 @@ ZSH_HOME="${ZSH_HOME:-$HOME/.zsh}"
 # Ensure directories exist
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$ZSH_HOME"
 
+# Detect operating system
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*) echo "macos" ;;
+        Linux*)  echo "linux" ;;
+        *)       echo "unknown" ;;
+    esac
+}
+
+OS_TYPE=$(detect_os)
+
 # Apply stow to the folders with backup capability
 stow_config() {
     local pkg=$1
@@ -130,38 +141,29 @@ stow_config() {
     if stow --no-folding -v -t "$HOME" -R "$pkg" 2>/dev/null; then
         log_success "Stowed $pkg"
     else
-        # If stow fails, try to adopt the files
-        log_warning "Stow failed for $pkg. Trying to adopt existing files..."
-        
-        # Create backup directory with timestamp
-        backup_dir="$HOME/.dotfiles-backup/$(date +%Y%m%d-%H%M%S)/$pkg"
-        mkdir -p "$backup_dir"
-        
-        # Find potential conflicting files and back them up
-        find "$pkg" -type f -o -type l | while read -r file; do
-            target="$HOME/${file#*/}"
-            if [ -e "$target" ]; then
-                target_dir=$(dirname "$target")
-                backup_target_dir="$backup_dir/${target_dir#$HOME/}"
-                mkdir -p "$backup_target_dir"
-                log_info "Backing up $target to $backup_dir"
-                mv "$target" "$backup_target_dir"
-            fi
-        done
-        
-        # Try stow again
-        if stow --no-folding -v -t "$HOME" -R "$pkg"; then
-            log_success "Stowed $pkg after backing up conflicting files"
-        else
-            log_error "Failed to stow $pkg even after backing up. Please check manually."
-        fi
+        log_error "Failed to stow $pkg even after backing up. Please check manually."
     fi
 }
 
 # Apply stow to dotfiles
 log_info "Applying stow to dotfiles..."
-for pkg in zsh tmux nvim git python bash; do
-    stow_config "$pkg"
+for pkg in zsh tmux nvim git python bash rofi kanata linux vscode; do
+    if [ "$pkg" = "vscode" ]; then
+        if [ "$OS_TYPE" = "macos" ]; then
+            log_info "Stowing VS Code for macOS"
+            stow --no-folding -v -t "$HOME/Library/Application Support" -R "$pkg" 2>/dev/null || log_warning "Failed to stow $pkg"
+        else
+            log_info "Stowing VS Code for Linux"
+            stow_config "$pkg"
+        fi
+    elif [ "$pkg" = "linux" ]; then
+        if [ "$OS_TYPE" = "linux" ]; then
+            log_info "Stowing Linux configuration"
+            stow_config "$pkg"
+        fi
+    else
+        stow_config "$pkg"
+    fi
 done
 
 if [ "$STOW_ONLY" = true ]; then
