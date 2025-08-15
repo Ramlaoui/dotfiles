@@ -29,6 +29,7 @@ core_packages=(
     "tmux"
     "stow"
     "ripgrep"
+    "uv"
 )
 
 # Packages that should always be built from source
@@ -58,6 +59,7 @@ git_packages=(
     ["tmux"]="https://github.com/tmux/tmux autotools"
     ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
     ["ripgrep"]="https://github.com/BurntSushi/ripgrep rust"
+    ["uv"]="https://astral.sh/uv/install.sh uv"
 )
 
 # Parse command-line options
@@ -395,6 +397,9 @@ function install_from_git() {
     ripgrep)
         curl -LO https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep_14.1.0-1_amd64.deb
         dpkg -i ripgrep_14.1.0-1_amd64.deb
+        ;;
+    uv)
+        curl -sSfL https://astral.sh/uv/install.sh | sh
         ;;
     *)
         echo -e "${YELLOW}Unknown build type: $build_type${RESET}"
