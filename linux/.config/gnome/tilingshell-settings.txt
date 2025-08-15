@@ -1,0 +1,8 @@
+[/]
+enable-tiling-system-windows-suggestions=false
+move-window-down=['<Control><Super>Down']
+move-window-left=['<Control><Super>Left']
+move-window-right=['<Control><Super>Right']
+move-window-up=['<Control><Super>Up']
+quarter-tiling-threshold=uint32 50
+selected-layouts=[['Layout 1', 'Layout 1'], ['Layout 1', 'Layout 1']]
