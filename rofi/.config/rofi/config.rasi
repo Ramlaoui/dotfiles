@@ -1,0 +1,76 @@
+configuration {
+    modi: "drun,run,window,ssh,combi,filebrowser";
+    font: "Fira Code 12";
+    show-icons: true;
+    icon-theme: "Papirus";
+    display-drun: " Apps";
+    display-run: " Run";
+    display-window: " Windows";
+    display-ssh: " SSH";
+    display-combi: " All";
+    display-filebrowser: "📁 Files";
+    sidebar-mode: false;
+    case-sensitive: false;
+    cycle: true;
+    fuzzy: true;
+    matching: "fuzzy";
+    sort: true;
+    threads: 0;
+    scroll-method: 0;
+    kb-cancel: "Escape,Control+g,Control+bracketleft";
+    kb-accept-entry: "Control+j,Control+m,Return,KP_Enter";
+    kb-remove-to-eol: "Control+k";
+    kb-mode-next: "Shift+Right,Control+Tab";
+    kb-mode-previous: "Shift+Left,Control+ISO_Left_Tab";
+    kb-row-down: "Down,Control+n";
+    kb-row-up: "Up,Control+p";
+    kb-row-select: "Control+space";
+}
+
+@theme "Arc-Dark"
+
+* {
+    background-color: #2f343f;
+    border-color: #2f343f;
+    text-color: #f3f4f5;
+    spacing: 0;
+    width: 40%;
+    min-width: 400px;
+    max-width: 800px;
+}
+
+inputbar {
+    border: 0 0 1px 0;
+    children: [prompt,entry];
+}
+
+prompt {
+    padding: 16px;
+    border: 0 1px 0 0;
+}
+
+textbox {
+    background-color: #2f343f;
+    border: 0 0 1px 0;
+    border-color: #4084d6;
+    padding: 8px 16px;
+}
+
+entry {
+    padding: 16px;
+}
+
+listview {
+    cycle: false;
+    margin: 0 0 -1px 0;
+    scrollbar: false;
+}
+
+element {
+    border: 0 0 1px 0;
+    padding: 16px;
+}
+
+element selected {
+    background-color: #4084d6;
+}
