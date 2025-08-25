@@ -38,4 +38,4 @@ export GPG_TTY=$(tty)
 
 # Other
 export SCRATCH="/network/scratch/a/ali.ramlaoui/"
-export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/credentials.json"
+# export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/gcloud/credentials.json"
