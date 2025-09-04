@@ -18,22 +18,21 @@
 
 (defalias
   cap (tap-hold 200 200 caps lctl)
-  hyper (tap-hold 200 200 spc (multi lctl lalt lsft lmet))
+  hyper (tap-hold 200 200 tab (multi lctl lalt lsft lmet))
 )
 
 (defoverrides
   (lsft grv) (ralt esc)
 )
 
-
 ;;  tilde (multi-tap 200 asciitilde grave)
 
 (deflayer main
   grv    1    2    3    4    5    6    7    8    9    0    -    =    bspc
-  tab    q    w    e    r    t    y    u    i    o    p    [    ]    \
+  @hyper q    w    e    r    t    y    u    i    o    p    [    ]    \
   @cap   a    s    d    f    g    h    j    k    l    ;    '    ret
   lsft   z    x    c    v    b    n    m    ,    .    /    ▲   rsft
-  lctl lalt lmet             @hyper        rmet ralt ◀    ▼    ▶)
+  lctl lalt lmet             spc            rmet ralt ◀    ▼    ▶)
 
 (deflayer hyper-layer
   XX    lrld    XX    XX    XX    XX    XX    XX    XX    XX    XX    XX    XX    XX
