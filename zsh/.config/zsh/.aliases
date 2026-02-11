@@ -2,6 +2,10 @@
 
 # Aliases
 
+# Common directories
+alias work="cd $HOME/work"
+alias store="cd $STORE"
+
 # fzf
 alias f="find . -type f | fzf --preview 'bat --color=always --style=header,grid --line-range :500 {}'"
 
@@ -14,6 +18,7 @@ alias wdir="watch -d -n 1 'ls -lah --color=auto'"
 # General
 alias kilast='kill -9 %%' # Kill last background process
 alias sourcesh='source ~/.zshrc' # Reload zshrc
+alias cleangpu='pkill -9 -f "entaloracle/main.py"'
 
 # Find + manage aliases
 alias al='alias | less' # List all aliases
@@ -91,4 +96,66 @@ nvimconfig() {
 
 tmuxconfig() {
     nvim ~/.config/tmux/.tmux.conf
+}
+
+# Git worktree helpers
+alias wtl='git worktree list'
+alias wta='git worktree add'
+alias wtr='git worktree remove'
+alias wtp='git worktree prune'
+alias wtm='git worktree move'
+alias wtlock='git worktree lock'
+alias wtunlock='git worktree unlock'
+alias wtb='git branch -vv'
+
+# wtnew <branch> [base]
+wtnew() {
+  local b="$1"
+  local base="${2:-HEAD}"
+
+  if [ -z "$b" ]; then
+    echo "usage: wtnew <branch> [base]"
+    return 1
+  fi
+
+  git worktree add "../_wt_${b//\//-}" -b "$b" "$base"
+}
+
+# wtgo <branch>
+wtgo() {
+  local b="$1"
+
+  if [ -z "$b" ]; then
+    echo "usage: wtgo <branch>"
+    return 1
+  fi
+
+  local target
+  target="$(git worktree list --porcelain | awk -v branch="refs/heads/$b" '
+    $1=="worktree" { wt=$2 }
+    $1=="branch" && $2==branch { print wt; exit }
+  ')"
+
+  if [ -z "$target" ]; then
+    echo "no worktree found for branch: $b"
+    return 1
+  fi
+
+  cd "$target" || return
+}
+
+# wtnewgo <branch> [base]
+wtnewgo() {
+  local b="$1"
+  local base="${2:-HEAD}"
+
+  if [ -z "$b" ]; then
+    echo "usage: wtnewgo <branch> [base]"
+    return 1
+  fi
+
+  local target="../_wt_${b//\//-}"
+
+  git worktree add "$target" -b "$b" "$base" || return
+  cd "$target" || return
 }
