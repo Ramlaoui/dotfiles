@@ -12,8 +12,8 @@ alias editbashfunc="$EDITOR ~/.config/bash/.bash_functions"
 # Source bash configuration
 alias sourcebash="source ~/.bashrc"
 
-# Kill last background process (bash-specific syntax)
-alias kilast='kill -9 $!'
+# Kill the current shell job, including a foreground job suspended with Ctrl-Z.
+alias kilast='kill -9 %%'
 
 # Watch directory changes (bash-specific syntax)
 alias wdir="watch -d -n 1 'ls -lah --color=auto'"
