@@ -147,7 +147,7 @@ stow_config() {
 
 # Apply stow to dotfiles
 log_info "Applying stow to dotfiles..."
-for pkg in zsh tmux nvim git python bash rofi kanata linux vscode; do
+for pkg in zsh tmux nvim git python bash rofi kanata linux vscode ghostty; do
     if [ "$pkg" = "vscode" ]; then
         if [ "$OS_TYPE" = "macos" ]; then
             log_info "Stowing VS Code for macOS"
@@ -159,6 +159,11 @@ for pkg in zsh tmux nvim git python bash rofi kanata linux vscode; do
     elif [ "$pkg" = "linux" ]; then
         if [ "$OS_TYPE" = "linux" ]; then
             log_info "Stowing Linux configuration"
+            stow_config "$pkg"
+        fi
+    elif [ "$pkg" = "ghostty" ]; then
+        if [ "$OS_TYPE" = "macos" ]; then
+            log_info "Stowing Ghostty for macOS"
             stow_config "$pkg"
         fi
     else

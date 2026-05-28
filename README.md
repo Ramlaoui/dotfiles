@@ -31,6 +31,7 @@ Tree structure of the repository:
 ```bash
 .
 ├── git/                  # Git configuration
+├── ghostty/              # Ghostty terminal configuration
 ├── install.sh            # Main installation script
 ├── macos/                # macOS specific configurations
 ├── nvim/                 # Neovim configuration
