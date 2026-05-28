@@ -1,0 +1,12 @@
+" Dotfiles-managed Tridactyl bindings.
+" Keep this file free of site-specific private exclusions and profile data.
+
+" Make command completion navigation match normal vim-style vertical movement.
+bind --mode=ex <C-j> ex.next_completion
+bind --mode=ex <C-k> ex.prev_completion
+
+" Toggle ignore mode when a page or editor should receive keys directly.
+bind <C-,> mode ignore
+bind --mode=insert <C-,> mode ignore
+bind --mode=input <C-,> mode ignore
+bind --mode=ignore <C-,> mode normal

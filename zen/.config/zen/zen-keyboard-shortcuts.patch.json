@@ -1,0 +1,69 @@
+{
+  "shortcuts": [
+    {
+      "id": "zen-split-view-horizontal",
+      "key": "h",
+      "keycode": "",
+      "modifiers": {
+        "control": true,
+        "alt": false,
+        "shift": false,
+        "meta": true,
+        "accel": false
+      },
+      "disabled": false
+    },
+    {
+      "id": "zen-split-view-vertical",
+      "key": "v",
+      "keycode": "",
+      "modifiers": {
+        "control": true,
+        "alt": false,
+        "shift": false,
+        "meta": true,
+        "accel": false
+      },
+      "disabled": false
+    },
+    {
+      "id": "zen-split-view-grid",
+      "key": "g",
+      "keycode": "",
+      "modifiers": {
+        "control": true,
+        "alt": false,
+        "shift": false,
+        "meta": true,
+        "accel": false
+      },
+      "disabled": false
+    },
+    {
+      "id": "zen-split-view-unsplit",
+      "key": "u",
+      "keycode": "",
+      "modifiers": {
+        "control": true,
+        "alt": false,
+        "shift": false,
+        "meta": true,
+        "accel": false
+      },
+      "disabled": false
+    },
+    {
+      "id": "zen-new-empty-split-view",
+      "key": "s",
+      "keycode": "",
+      "modifiers": {
+        "control": true,
+        "alt": false,
+        "shift": false,
+        "meta": true,
+        "accel": false
+      },
+      "disabled": false
+    }
+  ]
+}
