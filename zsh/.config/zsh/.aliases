@@ -16,7 +16,7 @@ alias inkscape-watch="inkscape-figures watch"
 alias wdir="watch -d -n 1 'ls -lah --color=auto'"
 
 # General
-alias kilast='kill -9 %%' # Kill last background process
+alias kilast='kill -9 %%'        # Kill last background process
 alias sourcesh='source ~/.zshrc' # Reload zshrc
 alias cleangpu='pkill -9 -f "entaloracle/main.py"'
 
@@ -30,11 +30,11 @@ alias cpwd='pwd | pbcopy'
 alias pa='pbpaste'
 
 # Finding files and directories
-alias dud='du -d 1 -h'                                  # List sizes of files within directory
-alias duds='du -d 1 -h | sort -h'                                  # List sizes of files within directory
-alias duf='du -sh *'                                    # List total size of current directory
-alias dufs='du -sh * | sort -h'                                    # List total size of current directory
-alias ff='find . -type f -name'                         # Find a file by name within current directory
+alias dud='du -d 1 -h'                                           # List sizes of files within directory
+alias duds='du -d 1 -h | sort -h'                                # List sizes of files within directory
+alias duf='du -sh *'                                             # List total size of current directory
+alias dufs='du -sh * | sort -h'                                  # List total size of current directory
+alias ff='find . -type f -name'                                  # Find a file by name within current directory
 command -v fd >/dev/null 2>&1 || alias fd='find . -type d -name' # Find directory by name
 
 # Displaying files
@@ -49,6 +49,10 @@ alias dotfiles="cd ${DOTFILES_DIR:-$HOME/dotfiles}"
 
 # orgmode
 alias notes="nvim ~/org/refile.org"
+
+# Obsidian
+alias vault='cd "$OBSIDIAN_VAULT"'
+alias openvault='open -a "Obsidian" "$OBSIDIAN_VAULT"'
 
 # SSH
 alias ssconfig="nvim ~/.ssh/config"
@@ -67,6 +71,11 @@ alias ta='tmux attach-session -t'
 alias tn='tmux new-session -s'
 alias tl='tmux list-sessions'
 alias tk='tmux kill-session -t'
+
+# emacs
+alias ec="emacsclient -c -n -a ''"
+alias et="emacsclient -t -a ''"
+alias ek="emacsclient -e '(kill-emacs)'"
 
 # iCloud Drive
 export DRIVE="~/Library/Mobile\ Documents/com~apple~CloudDocs"
@@ -95,7 +104,7 @@ nvimconfig() {
 }
 
 tmuxconfig() {
-    nvim ~/.config/tmux/.tmux.conf
+    nvim ~/.config/tmux/tmux.conf
 }
 
 # Git worktree helpers

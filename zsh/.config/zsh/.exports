@@ -8,13 +8,18 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export NPM_CONFIG_PREFIX="$XDG_DATA_HOME/node"
 
 # Set PATH
-export PATH="$HOME/.local/bin:$XDG_DATA_HOME/node/bin:$PATH"
+export PATH="$XDG_CONFIG_HOME/emacs/bin:$HOME/.local/bin:$XDG_DATA_HOME/node/bin:$PATH"
 
 # neovim as default editor
-export EDITOR=nvim
-export VISUAL=nvim
+# export EDITOR=nvim
+# export VISUAL=nvim
 export MANPAGER='nvim --cmd ":lua vim.g.noplugins=1" +Man!'
 export MANWIDTH=999
+
+# Emacs as default editor
+export ALTERNATE_EDITOR=""
+export EDITOR="emacsclient -t"                  # $EDITOR opens in terminal
+export VISUAL="emacsclient -c -a emacs"         # $VISUAL opens in GUI mode
 
 # Set fuzzy finder
 export CM_LAUNCHER="fzf"

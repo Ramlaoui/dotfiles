@@ -268,7 +268,7 @@ nvimconfig() {
 }
 
 tmuxconfig() {
-    nvim ~/.config/tmux/.tmux.conf
+    nvim ~/.config/tmux/tmux.conf
 }
 
 export EDITOR=nvim

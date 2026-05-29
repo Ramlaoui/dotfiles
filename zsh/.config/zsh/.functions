@@ -106,7 +106,7 @@ function nvimconfig() {
 }
 
 function tmuxconfig() {
-    nvim ~/.config/tmux/.tmux.conf
+    nvim ~/.config/tmux/tmux.conf
 }
 
 # File functions
@@ -345,3 +345,7 @@ function rsyncgit () {
 
     command rsync "$@"
 }
+
+if [ -f "${HOME}/dotfiles/zsh/.config/zsh/ccs_vscode_functions.zsh" ]; then
+    source "${HOME}/dotfiles/zsh/.config/zsh/ccs_vscode_functions.zsh"
+fi
