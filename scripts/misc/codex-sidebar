@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir="${CODEX_TMUX_SIDEBAR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/codex-tmux-sidebar}"
+pending_file="$state_dir/pending.json"
+lock_file="$state_dir/lock"
+
+record_pending_launch() {
+  command -v jq >/dev/null 2>&1 || return 0
+  [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] || return 0
+
+  mkdir -p "$state_dir"
+  [[ -s "$pending_file" ]] || printf '[]\n' > "$pending_file"
+
+  local cwd now token tmp
+  cwd="$(pwd -P 2>/dev/null || pwd)"
+  now="$(date +%s)"
+  token="$$:$now:${RANDOM:-0}"
+  tmp="$(mktemp "$state_dir/pending.XXXXXX")"
+
+  (
+    flock 9
+    jq \
+      --arg token "$token" \
+      --arg pane "$TMUX_PANE" \
+      --arg cwd "$cwd" \
+      --argjson now "$now" \
+      '[.[] | select(($now - (.created_at // 0)) < 3600)]
+       + [{token: $token, pane: $pane, cwd: $cwd, created_at: $now}]' \
+      "$pending_file" > "$tmp"
+    mv "$tmp" "$pending_file"
+  ) 9>"$lock_file"
+}
+
+record_pending_launch
+exec codex "$@"

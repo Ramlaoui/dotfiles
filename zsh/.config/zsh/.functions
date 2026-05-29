@@ -329,6 +329,18 @@ function tresizeright() {
   tmux resize-pane -R "$@"
 }
 
+function codex-sidebar() {
+  "${HOME}/dotfiles/scripts/misc/codex-sidebar" "$@"
+}
+
+function codex() {
+  if [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+    "${HOME}/dotfiles/scripts/misc/codex-sidebar" "$@"
+  else
+    command codex "$@"
+  fi
+}
+
 # Rsync helpers
 function rsync () {
     if [ -f "$XDG_CONFIG_HOME/rsync/.rsync.exclude" ]; then
