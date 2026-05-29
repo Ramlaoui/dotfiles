@@ -21,6 +21,7 @@ CORE_DEPENDENCY_ARGS=()
 INSTALL_TMUX_PLUGINS=false
 SKIP_SHELL_CHANGE=false
 VERBOSE=false
+WITH_OMARCHY=false
 SPECIFIC_PACKAGES=()
 
 # Function to display usage help
@@ -33,6 +34,7 @@ Options:
   --no-sudo         Install packages from source without using sudo
   --auto-yes        Automatically agree to prompts
   --skip-shell      Skip changing the default shell to zsh
+  --with-omarchy    Stow Omarchy-specific hooks
   --verbose         Show verbose output
   -h, --help        Show this help message and exit
 
@@ -60,6 +62,10 @@ while [[ $# -gt 0 ]]; do
         ;;
     --skip-shell)
         SKIP_SHELL_CHANGE=true
+        shift
+        ;;
+    --with-omarchy)
+        WITH_OMARCHY=true
         shift
         ;;
     --verbose)
@@ -138,10 +144,10 @@ stow_config() {
     fi
     
     # Stow with sane options: --no-folding prevents weird deep directory behavior
-    if stow --no-folding -v -t "$HOME" -R "$pkg" 2>/dev/null; then
+    if stow --no-folding -v -t "$HOME" -R "$pkg"; then
         log_success "Stowed $pkg"
     else
-        log_error "Failed to stow $pkg even after backing up. Please check manually."
+        log_error "Failed to stow $pkg. Resolve the conflicts above and retry."
     fi
 }
 
@@ -170,6 +176,15 @@ for pkg in zsh tmux nvim git python bash rofi kanata linux vscode ghostty; do
         stow_config "$pkg"
     fi
 done
+
+if [ "$WITH_OMARCHY" = true ]; then
+    if [ "$OS_TYPE" = "linux" ]; then
+        log_info "Stowing Omarchy hooks"
+        stow_config "omarchy"
+    else
+        log_warning "Omarchy hooks are Linux-specific, skipping"
+    fi
+fi
 
 if [ "$STOW_ONLY" = true ]; then
     log_success "Running stow only, skipping dependencies installation."
