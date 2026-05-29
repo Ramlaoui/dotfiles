@@ -1,0 +1,27 @@
+# Shared lock helpers for the Codex tmux sidebar bridge.
+#
+# mkdir is atomic on local filesystems and works on both macOS and Linux.
+# That is enough for the small JSON state updates in this bridge.
+
+: "${lock_dir:?lock_dir must be set before sourcing codex-tmux-sidebar-lock}"
+
+codex_tmux_sidebar_acquire_lock() {
+  local attempts max_attempts sleep_seconds
+  attempts=0
+  max_attempts="${CODEX_TMUX_SIDEBAR_LOCK_ATTEMPTS:-100}"
+  sleep_seconds="${CODEX_TMUX_SIDEBAR_LOCK_SLEEP:-0.05}"
+
+  while ! mkdir "$lock_dir" 2>/dev/null; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge "$max_attempts" ]; then
+      return 1
+    fi
+    sleep "$sleep_seconds"
+  done
+
+  return 0
+}
+
+codex_tmux_sidebar_release_lock() {
+  rmdir "$lock_dir" 2>/dev/null || true
+}
