@@ -87,16 +87,35 @@ function vsc-link() {
         return 1
     fi
 
-    python3 - "${1:-.}" <<'PY'
+    local mode="link"
+    case "${1:-}" in
+        --debug)
+            mode="debug"
+            shift
+            ;;
+        --raw)
+            mode="raw"
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: vsc-link [--debug|--raw] [path]"
+            return 0
+            ;;
+    esac
+
+    python3 - "$mode" "${1:-.}" <<'PY'
 import os
+import shlex
 import sys
 import urllib.parse
 
-target = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else "."
+mode = sys.argv[1]
+target = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else "."
 path = os.path.abspath(os.path.expanduser(target))
 label_path = path
+is_folder = os.path.isdir(path)
 
-if os.path.isdir(path) and not path.endswith("/"):
+if is_folder and not path.endswith("/"):
     path = f"{path}/"
 
 host = os.environ.get("VSCODE_SSH_HOST") or os.environ.get("HOSTNAME") or os.uname().nodename
@@ -106,9 +125,19 @@ host_q = urllib.parse.quote(host, safe="@.-_:")
 path_q = urllib.parse.quote(path, safe="/:._-~")
 
 uri = f"{scheme}://vscode-remote/ssh-remote+{host_q}{path_q}"
+remote_uri = f"vscode-remote://ssh-remote+{host_q}{path_q}"
 label = f"Open in VS Code: {label_path}"
 
-print(f"\033]8;;{uri}\033\\{label}\033]8;;\033\\")
+if mode == "raw":
+    print(uri)
+elif mode == "debug":
+    cli_arg = "--folder-uri" if is_folder else "--file-uri"
+    print(f"VS Code URL: {uri}")
+    print(f"Remote URI:  {remote_uri}")
+    print("Local CLI equivalent:")
+    print(f"  code {cli_arg} {shlex.quote(remote_uri)}")
+else:
+    print(f"\033]8;;{uri}\033\\{label}\033]8;;\033\\")
 PY
 }
 
