@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Warn if an Omarchy update replaced dotfiles-owned Neovim config files.
+# This hook is intentionally read-only: it does not run stow or rewrite files.
+
+set -u
+
+dotfiles_dir="${DOTFILES_DIR:-$HOME/dotfiles}"
+nvim_source="$dotfiles_dir/nvim/.config/nvim"
+nvim_target="$HOME/.config/nvim"
+warned=0
+
+warn() {
+  warned=1
+  printf 'Omarchy post-update warning: %s\n' "$1"
+}
+
+check_stowed_file() {
+  local rel_path=$1
+  local source_file="$nvim_source/$rel_path"
+  local target_file="$nvim_target/$rel_path"
+  local source_real
+  local target_real
+
+  # If this dotfiles checkout does not contain the file, it is not part of the
+  # Neovim ownership contract yet.
+  [[ -e "$source_file" ]] || return 0
+
+  if [[ ! -e "$target_file" ]]; then
+    warn "$target_file is missing"
+    return 0
+  fi
+
+  if [[ ! -L "$target_file" ]]; then
+    warn "$target_file is not a stow symlink"
+    return 0
+  fi
+
+  source_real=$(readlink -f "$source_file" 2>/dev/null || true)
+  target_real=$(readlink -f "$target_file" 2>/dev/null || true)
+
+  if [[ "$source_real" != "$target_real" ]]; then
+    warn "$target_file points to $target_real, expected $source_real"
+  fi
+}
+
+check_stowed_file "init.lua"
+check_stowed_file "lazyvim.json"
+check_stowed_file "lua/config/lazy.lua"
+check_stowed_file "lua/config/options.lua"
+check_stowed_file "lua/config/keymaps.lua"
+check_stowed_file "lua/config/autocmds.lua"
+check_stowed_file "lua/plugins/diffview.lua"
+
+if [[ "$warned" -eq 1 ]]; then
+  cat <<EOF
+
+Omarchy may have replaced part of the dotfiles-owned Neovim config.
+Review the live config against the dotfiles copy:
+  diff -qr "$nvim_target" "$nvim_source"
+
+If this is the first Neovim stow migration, merge any live-only files into:
+  "$nvim_source"
+
+If Omarchy clobbered a previously stowed config, move the conflicting live files
+or the whole live config aside before restowing. Plain stow cannot overwrite real
+files:
+  mv "$nvim_target" "$nvim_target.pre-stow-\$(date +%Y%m%d%H%M%S)"
+  cd "$dotfiles_dir"
+  stow --no-folding -v -t "\$HOME" -R nvim
+
+EOF
+fi
+
+exit 0
