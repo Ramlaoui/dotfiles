@@ -62,6 +62,18 @@ is_url_like() {
     has_url_scheme "$1" || [[ "$1" =~ ^www\. ]]
 }
 
+is_path_like() {
+    local target="$1"
+
+    [[ "$target" == /* ]] && return 0
+    [[ "$target" == ~* ]] && return 0
+    [[ "$target" == ./* || "$target" == ../* ]] && return 0
+    [[ "$target" == */* ]] && return 0
+    [[ -e "$target" ]] && return 0
+
+    return 1
+}
+
 normalize_target() {
     local target="$1"
 
@@ -70,6 +82,17 @@ normalize_target() {
     else
         printf '%s\n' "$target"
     fi
+}
+
+vscode_uri() {
+    local target="$1"
+    local helper="${VSCODE_REMOTE_LINK_HELPER:-$HOME/.config/zsh/scripts/vscode-remote-link}"
+
+    if [[ ! -x "$helper" ]]; then
+        return 1
+    fi
+
+    "$helper" --raw "$target"
 }
 
 desktop_open() {
@@ -134,7 +157,17 @@ if is_ssh_session && ! has_remote_gui_override; then
         exit 0
     fi
 
-    show_notice "tmux-smart-open: SSH session has no local opener for non-URL selections; use vsc-link for remote files"
+    if is_path_like "$target"; then
+        if uri=$(vscode_uri "$target"); then
+            show_hyperlink_popup "$uri" "Open in VS Code: $target"
+            exit 0
+        fi
+
+        show_notice "tmux-smart-open: VS Code link helper is missing; use vsc-link for remote files"
+        exit 1
+    fi
+
+    show_notice "tmux-smart-open: SSH session has no local opener for this selection"
     exit 1
 fi
 

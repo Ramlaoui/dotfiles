@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import shlex
+import sys
+import urllib.parse
+
+
+def build_uris(target):
+    path = os.path.abspath(os.path.expanduser(target or "."))
+    label_path = path
+    is_folder = os.path.isdir(path)
+
+    if is_folder and not path.endswith("/"):
+        path = f"{path}/"
+
+    host = os.environ.get("VSCODE_SSH_HOST") or os.environ.get("HOSTNAME") or os.uname().nodename
+    scheme = os.environ.get("VSCODE_URI_SCHEME", "vscode")
+
+    host_q = urllib.parse.quote(host, safe="@.-_:")
+    path_q = urllib.parse.quote(path, safe="/:._-~")
+
+    uri = f"{scheme}://vscode-remote/ssh-remote+{host_q}{path_q}"
+    remote_uri = f"vscode-remote://ssh-remote+{host_q}{path_q}"
+    return uri, remote_uri, label_path, is_folder
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Print a VS Code Remote-SSH link for a path.")
+    parser.add_argument("--raw", action="store_true", help="print only the clickable vscode:// URI")
+    parser.add_argument("--debug", action="store_true", help="print URI diagnostics and local code CLI equivalent")
+    parser.add_argument("path", nargs="?", default=".")
+    args = parser.parse_args()
+
+    uri, remote_uri, label_path, is_folder = build_uris(args.path)
+    label = f"Open in VS Code: {label_path}"
+
+    if args.raw:
+        print(uri)
+    elif args.debug:
+        cli_arg = "--folder-uri" if is_folder else "--file-uri"
+        print(f"VS Code URL: {uri}")
+        print(f"Remote URI:  {remote_uri}")
+        print("Local CLI equivalent:")
+        print(f"  code {cli_arg} {shlex.quote(remote_uri)}")
+    else:
+        print(f"\033]8;;{uri}\033\\{label}\033]8;;\033\\")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -82,63 +82,26 @@ function curssh() {
 }
 
 function vsc-link() {
-    if ! command -v python3 >/dev/null 2>&1; then
-        echo "vsc-link: python3 is required"
+    local helper="$HOME/.config/zsh/scripts/vscode-remote-link"
+    if [[ ! -x "$helper" ]]; then
+        echo "vsc-link: helper not found or not executable: $helper"
         return 1
     fi
 
-    local mode="link"
     case "${1:-}" in
         --debug)
-            mode="debug"
-            shift
+            "$helper" --debug "${2:-.}"
             ;;
         --raw)
-            mode="raw"
-            shift
+            "$helper" --raw "${2:-.}"
             ;;
         -h|--help)
             echo "Usage: vsc-link [--debug|--raw] [path]"
-            return 0
+            ;;
+        *)
+            "$helper" "${1:-.}"
             ;;
     esac
-
-    python3 - "$mode" "${1:-.}" <<'PY'
-import os
-import shlex
-import sys
-import urllib.parse
-
-mode = sys.argv[1]
-target = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] else "."
-path = os.path.abspath(os.path.expanduser(target))
-label_path = path
-is_folder = os.path.isdir(path)
-
-if is_folder and not path.endswith("/"):
-    path = f"{path}/"
-
-host = os.environ.get("VSCODE_SSH_HOST") or os.environ.get("HOSTNAME") or os.uname().nodename
-scheme = os.environ.get("VSCODE_URI_SCHEME", "vscode")
-
-host_q = urllib.parse.quote(host, safe="@.-_:")
-path_q = urllib.parse.quote(path, safe="/:._-~")
-
-uri = f"{scheme}://vscode-remote/ssh-remote+{host_q}{path_q}"
-remote_uri = f"vscode-remote://ssh-remote+{host_q}{path_q}"
-label = f"Open in VS Code: {label_path}"
-
-if mode == "raw":
-    print(uri)
-elif mode == "debug":
-    cli_arg = "--folder-uri" if is_folder else "--file-uri"
-    print(f"VS Code URL: {uri}")
-    print(f"Remote URI:  {remote_uri}")
-    print("Local CLI equivalent:")
-    print(f"  code {cli_arg} {shlex.quote(remote_uri)}")
-else:
-    print(f"\033]8;;{uri}\033\\{label}\033]8;;\033\\")
-PY
 }
 
 # File functions
