@@ -81,6 +81,37 @@ function curssh() {
     fi
 }
 
+function vsc-link() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "vsc-link: python3 is required"
+        return 1
+    fi
+
+    python3 - "${1:-.}" <<'PY'
+import os
+import sys
+import urllib.parse
+
+target = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] else "."
+path = os.path.abspath(os.path.expanduser(target))
+label_path = path
+
+if os.path.isdir(path) and not path.endswith("/"):
+    path = f"{path}/"
+
+host = os.environ.get("VSCODE_SSH_HOST") or os.environ.get("HOSTNAME") or os.uname().nodename
+scheme = os.environ.get("VSCODE_URI_SCHEME", "vscode")
+
+host_q = urllib.parse.quote(host, safe="@.-_:")
+path_q = urllib.parse.quote(path, safe="/:._-~")
+
+uri = f"{scheme}://vscode-remote/ssh-remote+{host_q}{path_q}"
+label = f"Open in VS Code: {label_path}"
+
+print(f"\033]8;;{uri}\033\\{label}\033]8;;\033\\")
+PY
+}
+
 # File functions
 function tmpclean() {
     cd $TMPDIR
