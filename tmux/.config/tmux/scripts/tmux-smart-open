@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+print_hyperlink() {
+    local target="$1"
+    local label="$2"
+
+    printf '\033]8;;%s\033\\%s\033]8;;\033\\\n' "$target" "$label"
+}
+
+show_notice() {
+    local message="$1"
+
+    if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+        tmux display-message "$message"
+    else
+        printf '%s\n' "$message" >&2
+    fi
+}
+
+show_hyperlink_popup() {
+    local target="$1"
+    local label="$2"
+
+    if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+        local target_q
+        local label_q
+        local script_q
+
+        printf -v target_q '%q' "$target"
+        printf -v label_q '%q' "$label"
+        printf -v script_q '%q' "${BASH_SOURCE[0]}"
+
+        tmux display-popup -E -w 80% -h 7 "TMUX_SMART_OPEN_TARGET=$target_q TMUX_SMART_OPEN_LABEL=$label_q $script_q --popup"
+    else
+        print_hyperlink "$target" "$label"
+    fi
+}
+
+is_ssh_session() {
+    if [[ -n "${SSH_CONNECTION:-}${SSH_CLIENT:-}" ]]; then
+        return 0
+    fi
+
+    if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+        tmux show-environment -g SSH_CONNECTION >/dev/null 2>&1 && return 0
+        tmux show-environment -g SSH_CLIENT >/dev/null 2>&1 && return 0
+    fi
+
+    return 1
+}
+
+has_remote_gui_override() {
+    [[ "${TMUX_SMART_OPEN_REMOTE_GUI:-}" == "1" || "${TMUX_SMART_OPEN_REMOTE_GUI:-}" == "true" ]]
+}
+
+has_url_scheme() {
+    [[ "$1" =~ ^[A-Za-z][A-Za-z0-9+.-]*:// ]]
+}
+
+is_url_like() {
+    has_url_scheme "$1" || [[ "$1" =~ ^www\. ]]
+}
+
+normalize_target() {
+    local target="$1"
+
+    if [[ "$target" =~ ^www\. ]]; then
+        printf 'https://%s\n' "$target"
+    else
+        printf '%s\n' "$target"
+    fi
+}
+
+desktop_open() {
+    local target="$1"
+    local platform
+
+    platform=$(uname)
+
+    if [[ "$platform" == "Darwin" ]] && command -v open >/dev/null 2>&1; then
+        open "$target" >/dev/null 2>&1 &
+        return 0
+    fi
+
+    if [[ "$platform" =~ CYGWIN ]] && command -v cygstart >/dev/null 2>&1; then
+        cygstart "$target" >/dev/null 2>&1 &
+        return 0
+    fi
+
+    if [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] && command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$target" >/dev/null 2>&1 &
+        return 0
+    fi
+
+    return 1
+}
+
+trim_selection() {
+    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+if [[ "${1:-}" == "--popup" ]]; then
+    target="${TMUX_SMART_OPEN_TARGET:?}"
+    label="${TMUX_SMART_OPEN_LABEL:-Open URL: $target}"
+
+    printf '\n'
+    print_hyperlink "$target" "$label"
+    printf '\nPress enter to close.'
+    IFS= read -r _ || true
+    exit 0
+fi
+
+if [[ -n "${TMUX_SMART_OPEN_CWD:-}" && -d "${TMUX_SMART_OPEN_CWD:-}" ]]; then
+    cd "$TMUX_SMART_OPEN_CWD"
+fi
+
+selection=$(cat | trim_selection)
+selection=${selection#\"}
+selection=${selection%\"}
+selection=${selection#\'}
+selection=${selection%\'}
+
+if [[ -z "$selection" ]]; then
+    show_notice "tmux-smart-open: no selection"
+    exit 1
+fi
+
+target=$(normalize_target "$selection")
+
+if is_ssh_session && ! has_remote_gui_override; then
+    if is_url_like "$target"; then
+        show_hyperlink_popup "$target" "Open URL in local browser"
+        exit 0
+    fi
+
+    show_notice "tmux-smart-open: SSH session has no local opener for non-URL selections; use vsc-link for remote files"
+    exit 1
+fi
+
+if desktop_open "$target"; then
+    exit 0
+fi
+
+if is_url_like "$target"; then
+    show_hyperlink_popup "$target" "Open URL in local browser"
+    exit 0
+fi
+
+show_notice "tmux-smart-open: no desktop opener available"
+exit 1
