@@ -44,6 +44,9 @@ list_worktrees() {
   local root="$1"
   local path="" branch="" head="" bare=0
 
+  # `git worktree list --porcelain` emits one blank-line-separated record per
+  # worktree. We keep parsing state in locals, then print one tab-separated row
+  # for fzf: label, absolute path, HEAD sha.
   emit() {
     local label
     [[ -n "$path" && "$bare" -eq 0 ]] || return 0
@@ -85,6 +88,9 @@ find_window_for_path() {
   local session="$2"
   local window_id pane_path tagged_path pane_root
 
+  # Prefer the explicit @worktree_path tag, but also recognize existing windows
+  # whose active pane is already inside the selected worktree. That lets old
+  # windows get adopted the first time they are selected.
   while IFS=$'\t' read -r window_id pane_path tagged_path; do
     [[ -n "$window_id" ]] || continue
     pane_root=""
@@ -104,6 +110,8 @@ find_window_for_path() {
 
 pane_is_shell() {
   local command="$1"
+  # `pane-cd` sends text into the current pane. Only do that when tmux reports a
+  # real shell; sending `cd ...` into nvim/python/etc. would be destructive.
   case "$command" in
     bash | zsh | fish | sh | dash | ksh | mksh | nu | elvish) return 0 ;;
     *) return 1 ;;
@@ -115,6 +123,8 @@ shell_cd_command() {
   local path="$2"
   local quoted
 
+  # Use Bash's %q quoting for the path before injecting it into a shell pane.
+  # This keeps spaces and most punctuation in worktree paths safe.
   printf -v quoted '%q' "$path"
   case "$command" in
     fish)
@@ -176,6 +186,8 @@ main() {
 
   [[ -n "$rows" ]] || die "no worktrees found"
 
+  # Show the human label and path, while keeping the HEAD sha available as the
+  # third hidden-ish field for future extension.
   selected="$(
     printf '%s\n' "$rows" |
       fzf \
@@ -200,6 +212,8 @@ main() {
 
     cd_command="$(shell_cd_command "$pane_command" "$path")"
     tmux send-keys -t "$pane_id" "$cd_command" C-m
+    # Pane options are separate from window options; this tag documents where
+    # the pane was last moved by this helper.
     tmux set-option -p -t "$pane_id" @worktree_path "$path" >/dev/null
     exit 0
   fi
@@ -211,6 +225,8 @@ main() {
 
   name="$(window_name_for "$branch" "$path")"
   new_window_id="$(tmux new-window -P -F '#{window_id}' -c "$path" -n "$name")"
+  # Window mode uses a window tag so future runs can select this exact window
+  # even if the pane cwd changes later.
   tmux set-option -w -t "$new_window_id" @worktree_path "$path" >/dev/null
 }
 
