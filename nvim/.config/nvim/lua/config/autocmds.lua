@@ -19,10 +19,5 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.linebreak = true
     vim.opt_local.spell = false
 
-    -- Markdown preview toggle (only if the command exists).
-    if vim.bo[ev.buf].filetype == "markdown" and vim.fn.exists(":MarkdownPreviewToggle") == 2 then
-      vim.keymap.set("n", "<leader>lm", "<cmd>MarkdownPreviewToggle<CR>", { buffer = ev.buf, desc = "Markdown preview" })
-    end
   end,
 })
-
