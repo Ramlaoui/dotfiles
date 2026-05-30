@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+  printf 'tmux-worktree-window: %s\n' "$*" >&2
+  if [[ -n "${TMUX:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    tmux display-message "tmux-worktree-window: $*"
+  fi
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: tmux-worktree-window [--mode window|pane-cd] [cwd]
+
+Modes:
+  window   Select an existing worktree window or create one. This is the default.
+  pane-cd  Send a cd command to the current pane, but only when it is a shell.
+EOF
+}
+
+window_name_for() {
+  local branch="$1"
+  local path="$2"
+  local name
+
+  if [[ -n "$branch" && "$branch" != detached:* ]]; then
+    name="${branch#refs/heads/}"
+  else
+    name="$(basename "$path")"
+  fi
+
+  name="${name//\//-}"
+  name="${name//:/-}"
+  name="${name// /-}"
+  printf '%s\n' "${name:0:48}"
+}
+
+list_worktrees() {
+  local root="$1"
+  local path="" branch="" head="" bare=0
+
+  emit() {
+    local label
+    [[ -n "$path" && "$bare" -eq 0 ]] || return 0
+
+    if [[ -n "$branch" ]]; then
+      label="${branch#refs/heads/}"
+    elif [[ -n "$head" ]]; then
+      label="detached:${head:0:8}"
+    else
+      label="$(basename "$path")"
+    fi
+
+    printf '%s\t%s\t%s\n' "$label" "$path" "$head"
+  }
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ -z "$line" ]]; then
+      emit
+      path=""
+      branch=""
+      head=""
+      bare=0
+      continue
+    fi
+
+    case "$line" in
+      worktree\ *) path="${line#worktree }" ;;
+      HEAD\ *) head="${line#HEAD }" ;;
+      branch\ *) branch="${line#branch }" ;;
+      bare) bare=1 ;;
+    esac
+  done < <(git -C "$root" worktree list --porcelain)
+
+  emit
+}
+
+find_window_for_path() {
+  local path="$1"
+  local session="$2"
+  local window_id pane_path tagged_path pane_root
+
+  while IFS=$'\t' read -r window_id pane_path tagged_path; do
+    [[ -n "$window_id" ]] || continue
+    pane_root=""
+    if [[ -n "$pane_path" ]]; then
+      pane_root="$(git -C "$pane_path" rev-parse --show-toplevel 2>/dev/null || true)"
+    fi
+
+    if [[ "$tagged_path" == "$path" || "$pane_path" == "$path" || "$pane_root" == "$path" ]]; then
+      tmux set-option -w -t "$window_id" @worktree_path "$path" >/dev/null
+      printf '%s\n' "$window_id"
+      return 0
+    fi
+  done < <(tmux list-windows -t "$session" -F '#{window_id}	#{pane_current_path}	#{@worktree_path}')
+
+  return 1
+}
+
+pane_is_shell() {
+  local command="$1"
+  case "$command" in
+    bash | zsh | fish | sh | dash | ksh | mksh | nu | elvish) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+shell_cd_command() {
+  local command="$1"
+  local path="$2"
+  local quoted
+
+  printf -v quoted '%q' "$path"
+  case "$command" in
+    fish)
+      printf 'cd %s\n' "$quoted"
+      ;;
+    *)
+      printf 'cd -- %s\n' "$quoted"
+      ;;
+  esac
+}
+
+main() {
+  need git
+  need fzf
+  need tmux
+
+  [[ -n "${TMUX:-}" ]] || die "must be run inside tmux"
+
+  local mode="window"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --mode)
+        [[ $# -ge 2 ]] || die "--mode requires window or pane-cd"
+        mode="$2"
+        shift 2
+        ;;
+      --mode=*)
+        mode="${1#--mode=}"
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        die "unknown option: $1"
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  case "$mode" in
+    window | pane-cd) ;;
+    *) die "unknown mode: $mode" ;;
+  esac
+
+  local cwd root session rows selected branch path head window_id name new_window_id pane_id pane_command cd_command
+  cwd="${1:-}"
+  [[ -n "$cwd" ]] || cwd="$(tmux display-message -p '#{pane_current_path}')"
+  root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" || die "current pane is not inside a git worktree"
+  session="$(tmux display-message -p '#{session_name}')"
+  rows="$(list_worktrees "$root")"
+
+  [[ -n "$rows" ]] || die "no worktrees found"
+
+  selected="$(
+    printf '%s\n' "$rows" |
+      fzf \
+        --prompt='worktree> ' \
+        --delimiter=$'\t' \
+        --with-nth=1,2 \
+        --preview='git -C {2} status --short --branch' \
+        --preview-window='down,40%,border-top'
+  )" || exit 0
+
+  [[ -n "$selected" ]] || exit 0
+
+  IFS=$'\t' read -r branch path head <<<"$selected"
+  [[ -n "$path" ]] || die "selected worktree has no path"
+
+  if [[ "$mode" == pane-cd ]]; then
+    pane_id="$(tmux display-message -p '#{pane_id}')"
+    pane_command="$(tmux display-message -p '#{pane_current_command}')"
+    if ! pane_is_shell "$pane_command"; then
+      die "current pane is running $pane_command, not a shell"
+    fi
+
+    cd_command="$(shell_cd_command "$pane_command" "$path")"
+    tmux send-keys -t "$pane_id" "$cd_command" C-m
+    tmux set-option -p -t "$pane_id" @worktree_path "$path" >/dev/null
+    exit 0
+  fi
+
+  if window_id="$(find_window_for_path "$path" "$session")"; then
+    tmux select-window -t "$window_id"
+    exit 0
+  fi
+
+  name="$(window_name_for "$branch" "$path")"
+  new_window_id="$(tmux new-window -P -F '#{window_id}' -c "$path" -n "$name")"
+  tmux set-option -w -t "$new_window_id" @worktree_path "$path" >/dev/null
+}
+
+main "$@"
