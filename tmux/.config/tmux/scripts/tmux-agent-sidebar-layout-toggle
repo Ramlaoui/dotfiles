@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+window_id="${1:?window id required}"
+pane_path="${2:-$HOME}"
+
+layout_option="@agent_sidebar_saved_layout"
+pane_ids_option="@agent_sidebar_saved_non_sidebar_panes"
+
+# Return a stable, comparable list of the real panes in this window.
+# The sidebar pane is intentionally excluded: it is temporary UI chrome, not
+# part of the user's working layout.
+pane_snapshot() {
+  tmux list-panes -t "$window_id" -F '#{pane_id}|#{@pane_role}' 2>/dev/null \
+    | awk -F'|' '$2 != "sidebar" { print $1 }' \
+    | sort \
+    | awk 'BEGIN { sep = "" } { printf "%s%s", sep, $0; sep = "," }'
+}
+
+# tmux-agent-sidebar marks its own pane with @pane_role=sidebar. That gives us
+# a reliable way to decide whether prefix+e should show or hide the sidebar.
+first_sidebar_pane() {
+  tmux list-panes -t "$window_id" -F '#{pane_id}|#{@pane_role}' 2>/dev/null \
+    | awk -F'|' '$2 == "sidebar" { print $1; exit }'
+}
+
+# Prefer the binary path exported by the plugin. The fallback keeps the wrapper
+# usable if it is invoked before the plugin has populated @agent_sidebar_bin.
+plugin_bin="${TMUX_AGENT_SIDEBAR_BIN:-}"
+if [[ -z "$plugin_bin" ]]; then
+  plugin_bin="$(tmux display-message -p '#{@agent_sidebar_bin}' 2>/dev/null || true)"
+fi
+if [[ -z "$plugin_bin" ]]; then
+  plugin_bin="$HOME/.config/tmux/plugins/tmux-agent-sidebar/bin/tmux-agent-sidebar"
+fi
+
+sidebar_pane="$(first_sidebar_pane)"
+if [[ -n "$sidebar_pane" ]]; then
+  # Hide path: compare the current real panes with the snapshot from when the
+  # sidebar was opened. If the user added/removed panes while the sidebar was
+  # visible, restoring the old layout would discard that newer structure.
+  saved_layout="$(tmux show-options -wqv -t "$window_id" "$layout_option" 2>/dev/null || true)"
+  saved_panes="$(tmux show-options -wqv -t "$window_id" "$pane_ids_option" 2>/dev/null || true)"
+  current_panes="$(pane_snapshot)"
+
+  tmux kill-pane -t "$sidebar_pane" || exit 0
+
+  # Restore only when the non-sidebar pane set is unchanged. If tmux refuses the
+  # saved layout anyway, leave the current layout alone rather than interrupting
+  # the user's toggle.
+  if [[ -n "$saved_layout" && -n "$saved_panes" && "$saved_panes" == "$current_panes" ]]; then
+    tmux select-layout -t "$window_id" "$saved_layout" 2>/dev/null || true
+  fi
+
+  # The saved values are single-use. Keeping stale layout data would make the
+  # next toggle restore a layout from the wrong moment.
+  tmux set-option -wq -u -t "$window_id" "$layout_option" 2>/dev/null || true
+  tmux set-option -wq -u -t "$window_id" "$pane_ids_option" 2>/dev/null || true
+  exit 0
+fi
+
+# Show path: capture the exact layout and real pane set before inserting the
+# sidebar, then delegate the actual pane creation to the upstream plugin.
+current_layout="$(tmux display-message -p -t "$window_id" '#{window_layout}')"
+current_panes="$(pane_snapshot)"
+
+if [[ -n "$current_layout" && -n "$current_panes" ]]; then
+  tmux set-option -wq -t "$window_id" "$layout_option" "$current_layout"
+  tmux set-option -wq -t "$window_id" "$pane_ids_option" "$current_panes"
+fi
+
+exec "$plugin_bin" toggle "$window_id" "$pane_path"
