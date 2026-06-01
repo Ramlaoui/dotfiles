@@ -6,6 +6,7 @@ pane_path="${2:-$HOME}"
 
 layout_option="@agent_sidebar_saved_layout"
 pane_ids_option="@agent_sidebar_saved_non_sidebar_panes"
+active_pane_option="@agent_sidebar_saved_active_pane"
 
 # Return a stable, comparable list of the real panes in this window.
 # The sidebar pane is intentionally excluded: it is temporary UI chrome, not
@@ -22,6 +23,10 @@ pane_snapshot() {
 first_sidebar_pane() {
   tmux list-panes -t "$window_id" -F '#{pane_id}|#{@pane_role}' 2>/dev/null \
     | awk -F'|' '$2 == "sidebar" { print $1; exit }'
+}
+
+pane_exists() {
+  tmux display-message -p -t "$1" '#{pane_id}' >/dev/null 2>&1
 }
 
 # Prefer the binary path exported by the plugin. The fallback keeps the wrapper
@@ -41,6 +46,8 @@ if [[ -n "$sidebar_pane" ]]; then
   # visible, restoring the old layout would discard that newer structure.
   saved_layout="$(tmux show-options -wqv -t "$window_id" "$layout_option" 2>/dev/null || true)"
   saved_panes="$(tmux show-options -wqv -t "$window_id" "$pane_ids_option" 2>/dev/null || true)"
+  saved_active_pane="$(tmux show-options -wqv -t "$window_id" "$active_pane_option" 2>/dev/null || true)"
+  current_active_pane="$(tmux display-message -p -t "$window_id" '#{pane_id}')"
   current_panes="$(pane_snapshot)"
 
   tmux kill-pane -t "$sidebar_pane" || exit 0
@@ -52,10 +59,22 @@ if [[ -n "$sidebar_pane" ]]; then
     tmux select-layout -t "$window_id" "$saved_layout" 2>/dev/null || true
   fi
 
+  # Opening prefix+e moves focus into the sidebar; closing it from there should
+  # return to the pane that launched it when that pane is still alive. If the
+  # user moved focus elsewhere before closing, keep that current focus instead.
+  if [[ "$current_active_pane" == "$sidebar_pane" ]]; then
+    if [[ -n "$saved_active_pane" ]] && pane_exists "$saved_active_pane"; then
+      tmux select-pane -t "$saved_active_pane" 2>/dev/null || true
+    fi
+  elif [[ -n "$current_active_pane" ]] && pane_exists "$current_active_pane"; then
+    tmux select-pane -t "$current_active_pane" 2>/dev/null || true
+  fi
+
   # The saved values are single-use. Keeping stale layout data would make the
   # next toggle restore a layout from the wrong moment.
   tmux set-option -wq -u -t "$window_id" "$layout_option" 2>/dev/null || true
   tmux set-option -wq -u -t "$window_id" "$pane_ids_option" 2>/dev/null || true
+  tmux set-option -wq -u -t "$window_id" "$active_pane_option" 2>/dev/null || true
   exit 0
 fi
 
@@ -63,10 +82,22 @@ fi
 # sidebar, then delegate the actual pane creation to the upstream plugin.
 current_layout="$(tmux display-message -p -t "$window_id" '#{window_layout}')"
 current_panes="$(pane_snapshot)"
+current_active_pane="$(tmux display-message -p -t "$window_id" '#{pane_id}')"
 
 if [[ -n "$current_layout" && -n "$current_panes" ]]; then
   tmux set-option -wq -t "$window_id" "$layout_option" "$current_layout"
   tmux set-option -wq -t "$window_id" "$pane_ids_option" "$current_panes"
 fi
+if [[ -n "$current_active_pane" ]]; then
+  tmux set-option -wq -t "$window_id" "$active_pane_option" "$current_active_pane"
+fi
 
-exec "$plugin_bin" toggle "$window_id" "$pane_path"
+"$plugin_bin" toggle "$window_id" "$pane_path"
+
+# Upstream restores focus to the pane that opened the sidebar because its
+# default UX is passive monitoring. Locally, prefix+e opens an interactive
+# control surface, so move focus into the sidebar after creation.
+sidebar_pane="$(first_sidebar_pane)"
+if [[ -n "$sidebar_pane" ]]; then
+  tmux select-pane -t "$sidebar_pane" 2>/dev/null || true
+fi
