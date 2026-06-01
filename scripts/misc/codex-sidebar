@@ -5,6 +5,7 @@ state_dir="${CODEX_TMUX_SIDEBAR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}
 pending_file="$state_dir/pending.json"
 lock_dir="$state_dir/lock.d"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+pending_max_age_seconds="${CODEX_TMUX_SIDEBAR_PENDING_MAX_AGE_SECONDS:-600}"
 
 # shellcheck source=scripts/misc/codex-tmux-sidebar-lock
 . "$script_dir/codex-tmux-sidebar-lock"
@@ -21,7 +22,8 @@ update_pending_file() {
     --arg pane "$TMUX_PANE" \
     --arg cwd "$cwd" \
     --argjson now "$now" \
-    '[.[] | select(($now - (.created_at // 0)) < 3600)]
+    --argjson max_age "$pending_max_age_seconds" \
+    '[.[] | select(($now - (.created_at // 0)) < $max_age)]
      + [{token: $token, pane: $pane, cwd: $cwd, created_at: $now}]' \
     "$pending_file" > "$tmp"; then
     mv "$tmp" "$pending_file"

@@ -7,6 +7,7 @@ pending_file="$state_dir/pending.json"
 sessions_file="$state_dir/sessions.json"
 lock_dir="$state_dir/lock.d"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+pending_max_age_seconds="${CODEX_TMUX_SIDEBAR_PENDING_MAX_AGE_SECONDS:-600}"
 
 # shellcheck source=scripts/misc/codex-tmux-sidebar-lock
 . "$script_dir/codex-tmux-sidebar-lock"
@@ -46,15 +47,16 @@ init_state_files() {
   [[ -s "$sessions_file" ]] || printf '{}\n' > "$sessions_file"
 }
 
-claim_pending_for_session_start() {
-  [[ "$event_name" == "session-start" && -n "$cwd" ]] || return 0
+claim_pending_for_session() {
+  [[ -n "$session_id" && -n "$cwd" ]] || return 0
 
   local rows row token candidate tmp
   rows="$(
     jq -r \
       --arg cwd "$cwd" \
       --argjson now "$now" \
-      '[.[] | select(.cwd == $cwd and (($now - (.created_at // 0)) < 3600))]
+      --argjson max_age "$pending_max_age_seconds" \
+      '[.[] | select(.cwd == $cwd and (($now - (.created_at // 0)) < $max_age))]
        | reverse[]
        | [.token, .pane]
        | @tsv' \
@@ -83,8 +85,10 @@ claim_pending_for_session_start() {
       tmp="$(mktemp "$state_dir/pending.XXXXXX")"
       jq \
         --arg token "$token" \
+        --arg pane "$pane" \
         --argjson now "$now" \
-        '[.[] | select(.token != $token and (($now - (.created_at // 0)) < 3600))]' \
+        --argjson max_age "$pending_max_age_seconds" \
+        '[.[] | select(.token != $token and .pane != $pane and (($now - (.created_at // 0)) < $max_age))]' \
         "$pending_file" > "$tmp"
       mv "$tmp" "$pending_file"
       return 0
@@ -117,12 +121,8 @@ pane=""
 if command -v jq >/dev/null 2>&1; then
   init_state_files
   if codex_tmux_sidebar_acquire_lock; then
-    if [[ "$event_name" == "session-start" ]]; then
-      claim_pending_for_session_start
-      [[ -n "$pane" ]] || resolve_session_pane
-    else
-      resolve_session_pane
-    fi
+    claim_pending_for_session
+    [[ -n "$pane" ]] || resolve_session_pane
     codex_tmux_sidebar_release_lock
   fi
 fi
