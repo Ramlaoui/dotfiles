@@ -30,12 +30,22 @@ core_packages=(
     "stow"
     "ripgrep"
     "uv"
+    "blesh"
+)
+
+optional_packages=(
+    "rustdesk-bin"
+)
+
+aur_packages=(
+    "rustdesk-bin"
 )
 
 # Packages that should always be built from source
 always_build_from_source=(
     "tmux"
     "fzf"
+    "blesh"
 )
 
 # Additional dependencies for specific packages
@@ -60,6 +70,12 @@ git_packages=(
     ["stow"]="https://git.savannah.gnu.org/git/stow.git perl"
     ["ripgrep"]="https://github.com/BurntSushi/ripgrep rust"
     ["uv"]="https://astral.sh/uv/install.sh uv"
+    ["blesh"]="https://github.com/akinomyoga/ble.sh.git blesh"
+)
+
+declare -A package_commands
+package_commands=(
+    ["rustdesk-bin"]="rustdesk"
 )
 
 # Parse command-line options
@@ -101,7 +117,8 @@ function print_usage() {
         "  --auto-yes   Automatically agree to prompts.\n" \
         "  --help       Show this help message and exit.\n" \
         "If no packages are specified, all core packages will be installed.\n" \
-        "Available packages: ${core_packages[*]}\n${RESET}"
+        "Core packages: ${core_packages[*]}\n" \
+        "Optional packages: ${optional_packages[*]}\n${RESET}"
 }
 
 # Show help menu if requested
@@ -141,9 +158,37 @@ function install_debian() {
     sudo apt-get install -y "$1"
 }
 
+function install_arch_pre_deps() {
+    local app="$1"
+    if [ "$app" = "rustdesk-bin" ]; then
+        echo -e "${PURPLE}Installing RustDesk repo dependencies via pacman${RESET}"
+        sudo pacman -S --needed --noconfirm \
+            gstreamer \
+            gst-plugins-base-libs \
+            gst-plugin-gtk \
+            gst-plugins-bad-libs \
+            gst-plugins-base \
+            xdotool
+    fi
+}
+
 function install_arch() {
-    echo -e "${PURPLE}Installing ${1} via pacman${RESET}"
-    sudo pacman -Sy --noconfirm "$1"
+    local app="$1"
+    for aur_package in "${aur_packages[@]}"; do
+        if [ "$app" = "$aur_package" ]; then
+            if ! command -v yay &>/dev/null; then
+                echo -e "${YELLOW}${app} is an AUR package and yay is not installed. Skipping.${RESET}"
+                return 1
+            fi
+            install_arch_pre_deps "$app" || return 1
+            echo -e "${PURPLE}Installing ${app} via yay${RESET}"
+            yay -S --needed --noconfirm --answerclean None --answerdiff None "$app"
+            return
+        fi
+    done
+
+    echo -e "${PURPLE}Installing ${app} via pacman${RESET}"
+    sudo pacman -S --needed --noconfirm "$app"
 }
 
 function install_mac() {
@@ -317,7 +362,11 @@ function install_from_git() {
     # Clone repository
     if [ ! -d "${BUILD_DIR}/$(basename "$repo_url" .git)" ]; then
         echo -e "${PURPLE}Cloning ${repo_url}${RESET}"
-        git clone "$repo_url"
+        if [ "$build_type" = "blesh" ]; then
+            git clone --recursive --depth 1 --shallow-submodules "$repo_url"
+        else
+            git clone "$repo_url"
+        fi
     else
         echo -e "${YELLOW}${package_name} source already exists. Pulling latest changes.${RESET}"
         cd "$(basename "$repo_url" .git)" || exit 1
@@ -326,6 +375,10 @@ function install_from_git() {
     fi
 
     cd "$(basename "$repo_url" .git)" || exit 1
+
+    if [ "$build_type" = "blesh" ]; then
+        git submodule update --init --recursive
+    fi
 
     # Set environment variables
     export CFLAGS="-I$HOME/.local/include $CFLAGS"
@@ -401,6 +454,10 @@ function install_from_git() {
     uv)
         curl -sSfL https://astral.sh/uv/install.sh | sh
         ;;
+    blesh)
+        make -j"$(nproc)"
+        make install PREFIX="$HOME/.local"
+        ;;
     *)
         echo -e "${YELLOW}Unknown build type: $build_type${RESET}"
         ;;
@@ -413,19 +470,21 @@ function install_from_git() {
 # Function to install package dependencies
 function install_package_deps() {
     local package="$1"
-    if [ -n "${package_deps[$package]}" ]; then
-        echo -e "${PURPLE}Installing dependencies for ${package}${RESET}"
-        if [ "$(uname -s)" = "Darwin" ]; then
-            brew install "${package_deps[$package]}"
-        elif [ -f "/etc/arch-release" ]; then
-            sudo pacman -S --noconfirm "${package_deps[$package]}"
-        elif [ -f "/etc/debian_version" ]; then
-            sudo apt-get install -y "${package_deps[$package]}"
-        fi
+    if [ -z "${package_deps[$package]}" ]; then
+        return 0
+    fi
+
+    echo -e "${PURPLE}Installing dependencies for ${package}${RESET}"
+    if [ "$(uname -s)" = "Darwin" ]; then
+        brew install "${package_deps[$package]}"
+    elif [ -f "/etc/arch-release" ]; then
+        sudo pacman -S --noconfirm "${package_deps[$package]}"
+    elif [ -f "/etc/debian_version" ]; then
+        sudo apt-get install -y "${package_deps[$package]}"
     fi
 }
 
-# Function to check if package is in the core_packages list
+# Function to check if package is in the known package lists
 function is_valid_package() {
     local package="$1"
     for core_package in "${core_packages[@]}"; do
@@ -433,7 +492,23 @@ function is_valid_package() {
             return 0
         fi
     done
+    for optional_package in "${optional_packages[@]}"; do
+        if [ "$package" = "$optional_package" ]; then
+            return 0
+        fi
+    done
     return 1
+}
+
+function is_package_installed() {
+    local app="$1"
+    if [ "$app" = "blesh" ]; then
+        [ -r "$HOME/.local/share/blesh/ble.sh" ]
+        return
+    fi
+
+    local app_command="${package_commands[$app]:-$app}"
+    command -v "$app_command" &>/dev/null
 }
 
 # Validate the specified packages
@@ -444,8 +519,10 @@ for package in "${SPECIFIC_PACKAGES[@]}"; do
 done
 
 # Main installation logic
+INSTALL_FAILURE=false
+
 for app in "${SPECIFIC_PACKAGES[@]}"; do
-    if ! command -v "$app" &>/dev/null; then
+    if ! is_package_installed "$app"; then
         # Check if package should always be built from source
         should_build_from_source=false
         for build_pkg in "${always_build_from_source[@]}"; do
@@ -458,13 +535,13 @@ for app in "${SPECIFIC_PACKAGES[@]}"; do
         if [ "$should_build_from_source" = true ] || [ "$USE_SUDO" = false ]; then
             if [ -n "${git_packages[$app]}" ]; then
                 IFS=' ' read -r repo_url build_type <<<"${git_packages[$app]}"
-                install_from_git "$app" "$repo_url" "$build_type"
+                install_from_git "$app" "$repo_url" "$build_type" || INSTALL_FAILURE=true
             else
                 echo -e "${YELLOW}No installation method for $app without sudo. Skipping.${RESET}"
+                INSTALL_FAILURE=true
             fi
         else
-            install_package_deps "$app"
-            multi_system_install "$app"
+            install_package_deps "$app" && multi_system_install "$app" || INSTALL_FAILURE=true
         fi
     else
         # Check version for specific packages
@@ -472,12 +549,12 @@ for app in "${SPECIFIC_PACKAGES[@]}"; do
             current_version=$(tmux -V | cut -d' ' -f2)
             if [ "$(printf '%s\n' "3.5" "$current_version" | sort -V | head -n1)" != "3.5" ]; then
                 echo -e "${YELLOW}${app} version $current_version is older than 3.5. Upgrading...${RESET}"
-                install_package_deps "$app"
+                install_package_deps "$app" || INSTALL_FAILURE=true
                 if [ -n "${git_packages[$app]}" ]; then
                     IFS=' ' read -r repo_url build_type <<<"${git_packages[$app]}"
-                    install_from_git "$app" "$repo_url" "$build_type"
+                    install_from_git "$app" "$repo_url" "$build_type" || INSTALL_FAILURE=true
                 else
-                    multi_system_install "$app"
+                    multi_system_install "$app" || INSTALL_FAILURE=true
                 fi
             else
                 echo -e "${YELLOW}${app} version $current_version is sufficient. Skipping.${RESET}"
@@ -489,5 +566,10 @@ for app in "${SPECIFIC_PACKAGES[@]}"; do
 done
 
 # All done
+if [ "$INSTALL_FAILURE" = true ]; then
+    echo -e "\n${YELLOW}One or more package installations failed.${RESET}"
+    exit 1
+fi
+
 echo -e "\n${PURPLE}All tasks completed successfully.${RESET}"
 exit 0

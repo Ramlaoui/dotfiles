@@ -7,8 +7,11 @@ export XDG_DATA_HOME="$HOME/.local/share"
 # Set NPM prefix
 export NPM_CONFIG_PREFIX="$XDG_DATA_HOME/node"
 
+# Set Bun prefix
+export BUN_INSTALL="$HOME/.bun"
+
 # Set PATH
-export PATH="$XDG_CONFIG_HOME/emacs/bin:$HOME/.local/bin:$XDG_DATA_HOME/node/bin:$PATH"
+export PATH="$BUN_INSTALL/bin:$XDG_CONFIG_HOME/emacs/bin:$HOME/.local/bin:$XDG_DATA_HOME/node/bin:$PATH"
 
 # neovim as default editor
 export EDITOR=nvim
@@ -39,7 +42,10 @@ export ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 export ADMIN="$ICLOUD/admin"
 
 # Git signing
-export GPG_TTY=$(tty)
+if tty -s; then
+    export GPG_TTY="$(tty)"
+    command -v gpg-connect-agent >/dev/null && gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1
+fi
 
 # Other
 export SCRATCH="/network/scratch/a/ali.ramlaoui/"

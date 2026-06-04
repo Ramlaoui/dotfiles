@@ -14,6 +14,7 @@ This directory contains configuration files for Bash that share common elements 
 
 - Shares common configuration (aliases, exports, functions) with ZSH
 - Uses Starship prompt if available
+- Uses ble.sh for autosuggestions when installed in `~/.local/share/blesh`
 - Supports FZF integration
 - Includes common utility functions and aliases
 - Properly sources Google Cloud SDK and conda if available

@@ -39,7 +39,8 @@ Options:
   -h, --help        Show this help message and exit
 
 You can specify specific packages to install after all options.
-Available packages: git curl python3-venv nvim fd-find git-delta lazygit bat eza tldr zsh htop fzf tmux stow ripgrep
+Core packages: git curl cmake python3-venv nvim fd-find git-delta lazygit bat eza tldr zsh htop fzf tmux stow ripgrep uv blesh
+Optional packages: rustdesk-bin
 EOF
 }
 

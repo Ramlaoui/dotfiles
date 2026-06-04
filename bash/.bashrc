@@ -17,6 +17,11 @@ export PATH=$XDG_DATA_HOME/node/bin:$PATH
 # If not running interactively, don't do anything
 [[ $- != *i* ]] && return
 
+# Load ble.sh early so it can wrap the readline-compatible settings below.
+if [[ -r $HOME/.local/share/blesh/ble.sh ]]; then
+    source -- "$HOME/.local/share/blesh/ble.sh" --attach=none
+fi
+
 export TERM='xterm-256color'
 
 # Source aliases (shared with zsh)
@@ -33,14 +38,6 @@ export TERM='xterm-256color'
 if command -v starship &> /dev/null; then
     eval "$(starship init bash)"
 fi
-
-# Initialize fzf if available
-if command -v fzf &> /dev/null; then
-    source <(fzf --bash)
-fi
-
-# Source fzf if available (alternate location)
-[[ ! -f ~/.fzf.bash ]] || source ~/.fzf.bash
 
 # Set up better history control
 HISTCONTROL=ignoreboth
@@ -59,5 +56,25 @@ if [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
 fi
 
+# Initialize fzf if available
+if command -v fzf &> /dev/null; then
+    if [[ ${BLE_VERSION-} ]]; then
+        ble-import -d integration/fzf-completion
+        ble-import -d integration/fzf-key-bindings
+    else
+        source <(fzf --bash)
+    fi
+fi
+
+# Source fzf if available (alternate location)
+[[ ${BLE_VERSION-} || ! -f ~/.fzf.bash ]] || source ~/.fzf.bash
+
 # Source local environment
 [[ ! -f "$HOME/.local/share/../bin/env" ]] || . "$HOME/.local/share/../bin/env"
+
+if [[ ${BLE_VERSION-} ]]; then
+    # Match Readline's C-c behavior in ble.sh vi mode.
+    ble-bind -m vi_imap -f 'C-c' discard-line
+    ble-bind -m vi_nmap -f 'C-c' discard-line
+    ble-attach
+fi
