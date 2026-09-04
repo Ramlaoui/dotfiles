@@ -19,6 +19,8 @@ alias wdir="watch -d -n 1 'ls -lah --color=auto'"
 alias kilast='kill -9 %%'        # Kill last background process
 alias sourcesh='source ~/.zshrc' # Reload zshrc
 alias cleangpu='pkill -9 -f "entaloracle/main.py"'
+# GUI recovery (restarts SDDM and ends the current graphical session)
+alias fixgui='sudo systemctl restart sddm'
 
 # Find + manage aliases
 alias al='alias | less' # List all aliases
