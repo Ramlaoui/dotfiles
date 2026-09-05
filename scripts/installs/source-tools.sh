@@ -383,8 +383,8 @@ discover_github_release() {
     metadata="$BUILD_ROOT/${result_prefix}.json"
     download_file "$api_url" "$metadata" || return 1
     tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$metadata" | sed -n '1p')
-    prerelease=$(sed -n 's/.*"prerelease"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$metadata" | sed -n '1p')
-    draft=$(sed -n 's/.*"draft"[[:space:]]*:[[:space:]]*\(true\|false\).*/\1/p' "$metadata" | sed -n '1p')
+    prerelease=$(sed -n 's/.*"prerelease"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/\1/p' "$metadata" | sed -n '1p')
+    draft=$(sed -n 's/.*"draft"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/\1/p' "$metadata" | sed -n '1p')
     [ -n "$tag" ] || { printf '%s\n' "GitHub release response has no tag_name: $api_url" >&2; return 1; }
     [ "$prerelease" = false ] || { printf '%s\n' "Refusing prerelease GitHub release: $tag" >&2; return 1; }
     [ "$draft" = false ] || { printf '%s\n' "Refusing draft GitHub release: $tag" >&2; return 1; }
