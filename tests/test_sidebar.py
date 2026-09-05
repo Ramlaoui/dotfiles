@@ -120,7 +120,7 @@ class SidebarStateTests(unittest.TestCase):
         self.assertEqual(second.wait(timeout=10), 0)
         pending = self._state("pending.json")
         self.assertEqual(len(pending), 2)
-        self.assertTrue(all(row["cwd"] == str(self.worktree) for row in pending))
+        self.assertTrue(all(row["cwd"] == str(self.worktree.resolve()) for row in pending))
         self.assertEqual(self._state("sessions.json"), {})
 
     def test_interrupted_owner_is_recovered(self):
@@ -198,6 +198,50 @@ class SidebarStateTests(unittest.TestCase):
         self.assertEqual(self._state("pending.json"), [])
         self.assertEqual(self._state("sessions.json")["session-1"]["pane"], "%1")
         self.assertIn("pane=%1 event=session-start", self.log.read_text())
+
+    def test_hook_matches_physical_launcher_cwd_through_symlink(self):
+        alias = self.root / "logical work tree alias"
+        alias.symlink_to(self.worktree, target_is_directory=True)
+        launch = self._run(SIDEBAR, "launch", cwd=alias)
+        self.assertEqual(launch.returncode, 0, launch.stderr)
+        pending = self._state("pending.json")
+        self.assertEqual(pending[0]["cwd"], str(self.worktree.resolve()))
+
+        result = subprocess.run(
+            [str(HOOK), "codex", "session-start"],
+            input=json.dumps({"session_id": "session-alias", "cwd": str(alias)}),
+            text=True,
+            env=self.env,
+            capture_output=True,
+            cwd=alias,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._state("pending.json"), [])
+        self.assertEqual(
+            self._state("sessions.json")["session-alias"]["cwd"],
+            str(self.worktree.resolve()),
+        )
+        self.assertEqual(self._state("sessions.json")["session-alias"]["pane"], "%1")
+        self.assertIn("pane=%1 event=session-start", self.log.read_text())
+
+    def test_hook_skips_inaccessible_event_cwd_without_consuming_pending(self):
+        launch = self._run(SIDEBAR, "launch", cwd=self.worktree)
+        self.assertEqual(launch.returncode, 0, launch.stderr)
+        inaccessible = self.root / "missing event cwd"
+        result = subprocess.run(
+            [str(HOOK), "codex", "session-start"],
+            input=json.dumps({"session_id": "session-missing", "cwd": str(inaccessible)}),
+            text=True,
+            env=self.env,
+            capture_output=True,
+            cwd=self.worktree,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self._state("pending.json")[0]["cwd"], str(self.worktree.resolve())
+        )
+        self.assertEqual(self._state("sessions.json"), {})
+        self.assertIn("ignoring inaccessible event cwd", result.stderr)
 
     @staticmethod
     def _quote(value):

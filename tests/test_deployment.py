@@ -147,12 +147,19 @@ class DependencyAdapterTest(unittest.TestCase):
             {
                 "HOME": str(self.root / "home"),
                 "XDG_DATA_HOME": str(self.root / "data"),
-                "PATH": f"{self.fake_bin}{os.pathsep}/usr/bin:/bin",
+                "PATH": str(self.fake_bin),
                 "DOTFILES_OS": "Linux",
                 "DOTFILES_DISTRO": "arch",
                 "AUTO_YES": "1",
             }
         )
+        # Keep the installer shell and the local-build failure path usable
+        # without allowing ambient dependency commands to satisfy requests.
+        for command in ("bash", "chmod", "make", "mkdir", "mktemp", "rm", "touch"):
+            source = shutil.which(command)
+            if source is None:
+                self.fail(f"required test utility is unavailable: {command}")
+            (self.fake_bin / command).symlink_to(source)
         Path(self.env["HOME"]).mkdir()
 
     def tearDown(self):
@@ -182,7 +189,7 @@ class DependencyAdapterTest(unittest.TestCase):
         )
         self.write_executable(
             "pacman",
-            '#!/bin/sh\nprintf \'pacman\' >> "$CALL_LOG"\nfor arg in "$@"; do printf \'<%s>\' "$arg" >> "$CALL_LOG"; done; printf \'\\n\' >> "$CALL_LOG"\ntouch "$FAKE_BIN/git-lfs" "$FAKE_BIN/node"\n',
+            '#!/bin/sh\nprintf \'pacman\' >> "$CALL_LOG"\nfor arg in "$@"; do printf \'<%s>\' "$arg" >> "$CALL_LOG"; done; printf \'\\n\' >> "$CALL_LOG"\ntouch "$FAKE_BIN/git-lfs" "$FAKE_BIN/node"\nchmod +x "$FAKE_BIN/git-lfs" "$FAKE_BIN/node"\n',
         )
         self.env.update({"CALL_LOG": str(self.log), "FAKE_BIN": str(self.fake_bin)})
 

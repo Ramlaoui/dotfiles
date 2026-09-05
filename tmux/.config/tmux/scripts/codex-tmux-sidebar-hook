@@ -105,7 +105,13 @@ remove_session() {
 }
 
 session_id="$(json_field '.session_id // .sessionId')"
-cwd="$(json_field '.cwd')"
+event_cwd="$(json_field '.cwd')"
+cwd=""
+if [[ -n "$event_cwd" ]]; then
+  if ! cwd="$(codex_tmux_sidebar_normalize_cwd "$event_cwd")"; then
+    codex_tmux_sidebar_error "ignoring inaccessible event cwd: $event_cwd"
+  fi
+fi
 now="$(date +%s)" || { codex_tmux_sidebar_error "cannot read current time"; exit 1; }
 pane=""
 

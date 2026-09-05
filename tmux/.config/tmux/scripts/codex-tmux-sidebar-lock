@@ -13,7 +13,13 @@ sessions_file="${sessions_file:-$state_dir/sessions.json}"
 codex_tmux_sidebar_error() {
   printf 'codex-tmux-sidebar: %s\n' "$*" >&2
 }
-
+codex_tmux_sidebar_normalize_cwd() {
+  local cwd="${1:-.}" normalized
+  [[ -n "$cwd" ]] || return 1
+  normalized="$(cd -- "$cwd" 2>/dev/null && pwd -P 2>/dev/null)" || return 1
+  [[ -n "$normalized" ]] || return 1
+  printf '%s\n' "$normalized"
+}
 codex_tmux_sidebar_proc_start() {
   local pid="$1"
   if [[ -r "/proc/$pid/stat" ]]; then

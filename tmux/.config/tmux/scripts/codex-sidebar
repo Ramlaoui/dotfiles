@@ -37,7 +37,10 @@ record_pending_launch() {
   [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] || return 0
 
   local cwd now
-  cwd="$(pwd -P 2>/dev/null || pwd)"
+  if ! cwd="$(codex_tmux_sidebar_normalize_cwd .)"; then
+    codex_tmux_sidebar_error "cannot determine physical launch cwd; skipping pane association"
+    return 0
+  fi
   now="$(date +%s)" || return 1
   codex_tmux_sidebar_with_state_lock update_pending_file "$cwd" "$now"
 }
