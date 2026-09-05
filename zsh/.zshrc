@@ -1,47 +1,41 @@
-ZDOTDIR=$HOME # The only way to change this from the default is to set it in the environment before starting zsh (.zshenv)...
-ZSH_DIR=$HOME/.config/zsh
+#!/usr/bin/env zsh
 
-export TERM='xterm-256color'
+_shell_config=${XDG_CONFIG_HOME:-${HOME:-.}/.config}/shell
+[[ -r "$_shell_config/env" ]] && source -- "$_shell_config/env"
+_shell_config=${XDG_CONFIG_HOME:-${HOME:-.}/.config}/shell
 
-[[ $- != *i* ]] && return # if not interactive shell, return
+# Local host settings are explicit and optional.
+[[ -r "${HOME:-.}/.zshrc.local" ]] && source -- "${HOME:-.}/.zshrc.local"
 
-# Source 
-source $HOME/.zshrc.local
+[[ $- != *i* ]] && return
 
-# Source exports
-[[ ! -f $ZSH_DIR/.exports ]] || source $ZSH_DIR/.exports
+[[ -r "$_shell_config/aliases" ]] && source -- "$_shell_config/aliases"
+alias sourcesh='source "${ZDOTDIR:-$HOME}/.zshrc"'
+[[ -r "$_shell_config/functions" ]] && source -- "$_shell_config/functions"
+_shell_zsh_config=${XDG_CONFIG_HOME:-${HOME:-.}/.config}/zsh
+[[ -r "$_shell_zsh_config/.zsh_functions" ]] && source -- "$_shell_zsh_config/.zsh_functions"
 
-# Source aliases
-[[ ! -f $ZSH_DIR/.aliases ]] || source $ZSH_DIR/.aliases
+# Prezto, Starship and fzf are optional integrations; startup never installs them.
+if [[ -r "${ZDOTDIR:-${HOME:-.}}/.zprezto/init.zsh" ]]; then
+    source -- "${ZDOTDIR:-${HOME:-.}}/.zprezto/init.zsh"
+fi
 
-# Source functions
-[[ ! -f $ZSH_DIR/.functions ]] || source $ZSH_DIR/.functions
+bindkey -v
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init zsh)"
+fi
 
-# source Prezto
-source "${ZDOTDIR}/.zprezto/init.zsh"
-
-# Source starship
-eval "$(starship init zsh)"
-
-# Problem with vi-mode and starship, this fixes it
 function zle-line-init zle-keymap-select {
-RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
-RPS2=$RPS1
-zle reset-prompt
+    RPS1="${${KEYMAP/vicmd/-- NORMAL --}/(main|viins)/-- INSERT --}"
+    RPS2=$RPS1
+    zle reset-prompt
 }
 zle -N zle-line-init
 zle -N zle-keymap-select
 
-# Source fzf if command fzf succeeds
-command -v fzf >/dev/null && source <(fzf --zsh)
+if command -v fzf >/dev/null 2>&1; then
+    source <(fzf --zsh)
+fi
+[[ ! -r "${HOME:-.}/.local/bin/env" ]] || source -- "${HOME:-.}/.local/bin/env"
 
-export PATH=$XDG_DATA_HOME/node/bin:$PATH
-
-
-. "$HOME/.local/share/../bin/env"
-
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/aliramlaoui/Downloads/google-cloud-sdk/path.zsh.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/aliramlaoui/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+unset _shell_config _shell_zsh_config

@@ -40,7 +40,7 @@ return {
           c = {
             description = "Calendar Event or Deadline",
             template = "* %^{Event Title}\n  SCHEDULED: %^{Event Date}T\n  %?\n  Notes: %^{Additional notes}",
-            target = "~/Org/calendar.org",
+            target = "~/org/calendar.org",
             headline = "Deadlines",
           },
           j = {

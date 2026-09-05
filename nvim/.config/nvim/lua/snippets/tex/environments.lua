@@ -39,7 +39,7 @@ local make_condition = require("luasnip.extras.conditions").make_condition
 local in_bullets_cond = make_condition(tex.in_bullets)
 local line_begin = require("luasnip.extras.conditions.expand").line_begin
 
-M = {
+local M = {
 	-- Header
 	autosnippet(
 		{
@@ -181,9 +181,7 @@ M = {
 			}
 		),
 		{
-			condition = function(line_to_cursor, matched_trigger, captures)
-				return M.in_text() and line_begin(line_to_cursor, matched_trigger, captures)
-			end,
+			condition = tex.begin_text,
 		}
 	),
 

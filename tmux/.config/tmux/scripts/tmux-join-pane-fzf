@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+orientation="${1:-horizontal}"
+target_pane="${2:-$(tmux display-message -p '#{pane_id}')}"
+
+case "$orientation" in
+  h|horizontal)
+    join_flag="-h"
+    orientation_label="horizontally"
+    ;;
+  v|vertical)
+    join_flag="-v"
+    orientation_label="vertically"
+    ;;
+  *)
+    tmux display-message "unknown join orientation: $orientation"
+    exit 1
+    ;;
+esac
+
+current_pane="$(tmux display-message -p -t "$target_pane" '#{pane_id}')"
+
+if ! command -v fzf >/dev/null 2>&1; then
+  tmux display-message "fzf is required for pane picker"
+  exit 1
+fi
+
+pane_rows="$(
+  tmux list-panes -a -F '#{pane_id}	#{session_name}:#{window_index}.#{pane_index}	#{pane_current_command}	#{pane_current_path}	#{@pane_role}' \
+    | awk -F '\t' -v current="$current_pane" '$1 != current && $5 != "sidebar" { print }'
+)"
+
+if [[ -z "$pane_rows" ]]; then
+  tmux display-message "no other panes available"
+  exit 0
+fi
+
+selection="$(
+  printf '%s\n' "$pane_rows" \
+    | fzf \
+        --reverse \
+        --delimiter=$'\t' \
+        --with-nth=2,3,4 \
+        --preview='tmux capture-pane -p -e -t {1} -S -80' \
+        --preview-window='right:60%:wrap' \
+        --prompt='join pane > '
+)" || exit 0
+
+source_pane="${selection%%$'\t'*}"
+
+if [[ -z "$(tmux show-options -pqv -t "$source_pane" @borrowed_origin_window 2>/dev/null || true)" ]]; then
+  tmux set-option -pq -t "$source_pane" @borrowed_origin_window "$(tmux display-message -p -t "$source_pane" '#{window_id}')"
+  tmux set-option -pq -t "$source_pane" @borrowed_origin_session "$(tmux display-message -p -t "$source_pane" '#{session_id}')"
+  tmux set-option -pq -t "$source_pane" @borrowed_origin_label "$(tmux display-message -p -t "$source_pane" '#{session_name}:#{window_index}.#{pane_index}')"
+  tmux set-option -pq -t "$source_pane" @borrowed_origin_window_name "$(tmux display-message -p -t "$source_pane" '#{window_name}')"
+fi
+
+if ! output="$(tmux join-pane "$join_flag" -s "$source_pane" -t "$target_pane" 2>&1)"; then
+  printf 'join-pane failed:\n%s\n\nPress Enter to close. ' "$output"
+  read -r _
+  exit 1
+fi
+tmux display-message "borrowed $source_pane $orientation_label; prefix ! returns it"

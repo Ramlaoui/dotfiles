@@ -1,6 +1,8 @@
 {
   "extras": [
-    "lazyvim.plugins.extras.editor.neo-tree"
+    "lazyvim.plugins.extras.editor.neo-tree",
+    "lazyvim.plugins.extras.lang.python",
+    "lazyvim.plugins.extras.coding.luasnip"
   ],
   "install_version": 8,
   "news": {
@@ -8,4 +10,3 @@
   },
   "version": 8
 }
-

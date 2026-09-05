@@ -1,0 +1,62 @@
+#!/bin/sh
+
+# Shared shell environment. Existing XDG values always win.
+_shell_home=${HOME:-.}
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$_shell_home/.config}
+XDG_DATA_HOME=${XDG_DATA_HOME:-$_shell_home/.local/share}
+XDG_STATE_HOME=${XDG_STATE_HOME:-$_shell_home/.local/state}
+export XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+
+BUN_INSTALL=${BUN_INSTALL:-$_shell_home/.bun}
+NPM_CONFIG_PREFIX=${NPM_CONFIG_PREFIX:-$XDG_DATA_HOME/node}
+export BUN_INSTALL NPM_CONFIG_PREFIX
+
+# Add user-managed bins without replacing or reordering the caller's PATH.
+for _shell_bin in \
+    "$BUN_INSTALL/bin" \
+    "$XDG_CONFIG_HOME/emacs/bin" \
+    "$_shell_home/.local/bin" \
+    "$XDG_DATA_HOME/node/bin"; do
+    if [ -d "$_shell_bin" ]; then
+        case ":$PATH:" in
+            *":$_shell_bin:"*) ;;
+            *) PATH="$_shell_bin:$PATH" ;;
+        esac
+    fi
+done
+unset _shell_bin
+export PATH
+
+EDITOR=${EDITOR:-nvim}
+VISUAL=${VISUAL:-$EDITOR}
+MANPAGER=${MANPAGER:-'nvim --cmd ":lua vim.g.noplugins=1" +Man!'}
+MANWIDTH=${MANWIDTH:-999}
+CM_LAUNCHER=${CM_LAUNCHER:-fzf}
+PYTHON_BASIC_REPL=${PYTHON_BASIC_REPL:-1}
+IPYTHONDIR=${IPYTHONDIR:-$XDG_CONFIG_HOME/ipython}
+export EDITOR VISUAL MANPAGER MANWIDTH CM_LAUNCHER PYTHON_BASIC_REPL IPYTHONDIR
+
+# Go discovers GOROOT itself; GOPATH is the only user path that needs a default.
+GOPATH=${GOPATH:-$_shell_home/go}
+export GOPATH
+if [ -d "$GOPATH/bin" ]; then
+    case ":$PATH:" in
+        *":$GOPATH/bin:"*) ;;
+        *) PATH="$GOPATH/bin:$PATH" ;;
+    esac
+    export PATH
+fi
+
+# Keep signing support useful without assuming a particular terminal or host.
+if [ -t 1 ] && command -v gpg-connect-agent >/dev/null 2>&1; then
+    GPG_TTY=$(tty)
+    export GPG_TTY
+    gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1
+fi
+
+# Host-private overrides are explicit and never part of this package.
+_shell_local="$XDG_CONFIG_HOME/shell/local"
+if [ -r "$_shell_local" ]; then
+    . "$_shell_local"
+fi
+unset _shell_home _shell_local

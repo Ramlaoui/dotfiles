@@ -2,7 +2,7 @@
 
 local M = {}
 
-M.conditions = require("luasnip-latex-snippets.luasnippets.utils.conditions")
-M.scaffolding = require("luasnip-latex-snippets.luasnippets.tex.utils.scaffolding")
+M.conditions = require("snippets.tex.utils.conditions")
+M.scaffolding = require("snippets.tex.utils.scaffolding")
 
 return M

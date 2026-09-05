@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+
+copy_pwd() {
+    if command -v pbcopy >/dev/null 2>&1; then
+        pwd | pbcopy
+    elif command -v wl-copy >/dev/null 2>&1; then
+        pwd | wl-copy
+    elif command -v xclip >/dev/null 2>&1; then
+        pwd | xclip -selection clipboard
+    else
+        printf '%s\n' "$(pwd)"
+    fi
+}
+
+mkcd() {
+    if [ "$#" -ne 1 ]; then
+        printf 'usage: mkcd DIRECTORY\n' >&2
+        return 2
+    fi
+    mkdir -p -- "$1" && cd -- "$1"
+}
+dotfiles() {
+    if [ -z "${DOTFILES_DIR:-}" ] || [ ! -d "$DOTFILES_DIR" ]; then
+        printf 'dotfiles: set DOTFILES_DIR to the repository path first\n' >&2
+        return 1
+    fi
+    cd -- "$DOTFILES_DIR"
+}
+
+editrc() {
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        "${EDITOR:-vi}" "${ZDOTDIR:-$HOME}/.zshrc"
+    else
+        "${EDITOR:-vi}" "${HOME}/.bashrc"
+    fi
+}
+
+nvimconfig() {
+    cd -- "${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+}
+
+tmuxconfig() {
+    "${EDITOR:-vi}" "${XDG_CONFIG_HOME:-$HOME/.config}/tmux/tmux.conf"
+}
+
+# Clean only an explicitly selected, private directory owned by this user.
+tmpclean() {
+    if [ "$#" -gt 1 ]; then
+        printf 'usage: tmpclean [PRIVATE_DIRECTORY]\n' >&2
+        return 2
+    fi
+
+    local target=${1:-${DOTFILES_TMPDIR:-${TMPDIR:-}}}
+    if [ -z "$target" ]; then
+        printf 'tmpclean: refusing an unset target; pass a private directory or set DOTFILES_TMPDIR/TMPDIR\n' >&2
+        return 1
+    fi
+    if [ ! -d "$target" ]; then
+        printf 'tmpclean: refusing a missing or non-directory target: %s\n' "$target" >&2
+        return 1
+    fi
+
+    # Validate and remove from inside the physical directory. This preserves
+    # every pathname byte, including a trailing newline in the directory name.
+    local target_id home_id root_id owner mode result
+    (
+        CDPATH= cd -P -- "$target" 2>/dev/null || {
+            printf 'tmpclean: refusing an invalid target: %s\n' "$target" >&2
+            exit 1
+        }
+        target_id=$(stat -Lc '%d:%i' . 2>/dev/null || stat -Lf '%d:%i' . 2>/dev/null) || {
+            printf 'tmpclean: cannot verify target identity: %s\n' "$target" >&2
+            exit 1
+        }
+        home_id=$(CDPATH= cd -P -- "${HOME:-/}" 2>/dev/null && (stat -Lc '%d:%i' . 2>/dev/null || stat -Lf '%d:%i' . 2>/dev/null)) || {
+            printf 'tmpclean: cannot verify home identity\n' >&2
+            exit 1
+        }
+        root_id=$(stat -Lc '%d:%i' / 2>/dev/null || stat -Lf '%d:%i' / 2>/dev/null) || {
+            printf 'tmpclean: cannot verify root identity\n' >&2
+            exit 1
+        }
+        if [ "$target_id" = "$root_id" ] || [ "$target_id" = "$home_id" ]; then
+            printf 'tmpclean: refusing root or home: %s\n' "$target" >&2
+            exit 1
+        fi
+        owner=$(stat -Lc %u . 2>/dev/null || stat -Lf %u . 2>/dev/null) || {
+            printf 'tmpclean: cannot verify ownership: %s\n' "$target" >&2
+            exit 1
+        }
+        if [ "$owner" != "$(id -u)" ]; then
+            printf 'tmpclean: refusing a directory not owned by this user: %s\n' "$target" >&2
+            exit 1
+        fi
+        mode=$(stat -Lc %a . 2>/dev/null || stat -Lf %Lp . 2>/dev/null) || {
+            printf 'tmpclean: cannot verify directory privacy: %s\n' "$target" >&2
+            exit 1
+        }
+        if [ $((8#$mode & 8#77)) -ne 0 ]; then
+            printf 'tmpclean: refusing a directory accessible by group or other users: %s\n' "$target" >&2
+            exit 1
+        fi
+        find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+    )
+    result=$?
+    return "$result"
+}
+
+extract() {
+    if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+        printf 'usage: extract ARCHIVE [OUTPUT_DIRECTORY]\n' >&2
+        return 2
+    fi
+
+    local archive=$1 output=${2:-.} archive_operand name base output_file output_stat
+    local output_template output_tmp archive_id output_id result
+    if [ ! -f "$archive" ]; then
+        printf "extract: archive does not exist: %s\n" "$archive" >&2
+        return 1
+    fi
+    if [ "$#" -eq 2 ] && { [ -e "$output" ] && [ ! -d "$output" ]; }; then
+        printf "extract: output is not a directory: %s\n" "$output" >&2
+        return 1
+    fi
+    if [ "$#" -eq 2 ]; then
+        mkdir -p -- "$output" || return 1
+    fi
+
+    case "$archive" in
+        [-@]*) archive_operand="./$archive" ;;
+        *) archive_operand=$archive ;;
+    esac
+    name=${archive##*/}
+    base=${name%.*}
+    case "$archive" in
+        *.tar.bz2|*.tbz2) command tar -xjf "$archive_operand" -C "$output" ;;
+        *.tar.gz|*.tgz) command tar -xzf "$archive_operand" -C "$output" ;;
+        *.tar.xz|*.txz) command tar -xJf "$archive_operand" -C "$output" ;;
+        *.tar.lz|*.tlz) command tar --lzip -xf "$archive_operand" -C "$output" ;;
+        *.tar.Z) command tar -xZf "$archive_operand" -C "$output" ;;
+        *.tar) command tar -xf "$archive_operand" -C "$output" ;;
+        *.zip) command unzip "$archive_operand" -d "$output" ;;
+        *.rar) command unrar x -- "$archive_operand" "$output/" ;;
+        *.7z) command 7z x "-o$output" -- "$archive_operand" ;;
+        *.gz|*.bz2|*.xz|*.Z)
+            output_file="$output/$base"
+            if [ -d "$output_file" ]; then
+                printf 'extract: output file name is already a directory: %s\n' "$output_file" >&2
+                return 1
+            fi
+            case "$output_file" in
+                [-@]*) output_stat="./$output_file" ;;
+                *) output_stat=$output_file ;;
+            esac
+            if [ -e "$output_file" ]; then
+                archive_id=$(stat -Lc '%d:%i' "$archive_operand" 2>/dev/null || stat -Lf '%d:%i' "$archive_operand" 2>/dev/null) || {
+                    printf 'extract: cannot verify archive identity\n' >&2
+                    return 1
+                }
+                output_id=$(stat -Lc '%d:%i' "$output_stat" 2>/dev/null || stat -Lf '%d:%i' "$output_stat" 2>/dev/null) || {
+                    printf 'extract: cannot verify output identity\n' >&2
+                    return 1
+                }
+                if [ "$archive_id" = "$output_id" ]; then
+                    printf 'extract: refusing archive and output that share an inode\n' >&2
+                    return 1
+                fi
+            fi
+            case "$output_file" in
+                [-@]*) output_template="./$output_file.tmp.XXXXXX" ;;
+                *) output_template="$output_file.tmp.XXXXXX" ;;
+            esac
+            output_tmp=$(mktemp "$output_template") || {
+                printf 'extract: cannot create a temporary output beside %s\n' "$output_file" >&2
+                return 1
+            }
+            case "$archive" in
+                *.gz) command gzip -cd -- "$archive_operand" > "$output_tmp" ;;
+                *.bz2) command bzip2 -cd -- "$archive_operand" > "$output_tmp" ;;
+                *.xz) command xz -cd -- "$archive_operand" > "$output_tmp" ;;
+                *.Z) command uncompress -c "$archive_operand" > "$output_tmp" ;;
+            esac
+            result=$?
+            if [ "$result" -eq 0 ]; then
+                mv -f -- "$output_tmp" "$output_file"
+                result=$?
+            else
+                rm -f -- "$output_tmp"
+            fi
+            return "$result"
+            ;;
+        *)
+            printf "extract: unknown archive format: %s\n" "$archive" >&2
+            return 1
+            ;;
+    esac
+    result=$?
+    return "$result"
+}
+
+compress() {
+    if [ "$#" -ne 2 ]; then
+        printf 'usage: compress INPUT OUTPUT_ARCHIVE\n' >&2
+        return 2
+    fi
+
+    local input=$1 output=$2 input_path input_dir input_name input_operand
+    local output_template output_tmp output_operand output_tmpdir input_id output_id result
+    if [ ! -e "$input" ]; then
+        printf "compress: input does not exist: %s\n" "$input" >&2
+        return 1
+    fi
+    if [ -z "$output" ]; then
+        printf 'compress: output archive is required\n' >&2
+        return 2
+    fi
+    if [ -e "$output" ]; then
+        case "$input" in
+            [-@]*) input_operand="./$input" ;;
+            *) input_operand=$input ;;
+        esac
+        case "$output" in
+            [-@]*) output_operand="./$output" ;;
+            *) output_operand=$output ;;
+        esac
+        input_id=$(stat -Lc '%d:%i' "$input_operand" 2>/dev/null || stat -Lf '%d:%i' "$input_operand" 2>/dev/null) || {
+            printf 'compress: cannot verify input identity\n' >&2
+            return 1
+        }
+        output_id=$(stat -Lc '%d:%i' "$output_operand" 2>/dev/null || stat -Lf '%d:%i' "$output_operand" 2>/dev/null) || {
+            printf 'compress: cannot verify output identity\n' >&2
+            return 1
+        }
+        if [ "$input_id" = "$output_id" ]; then
+            printf 'compress: refusing input and output that share an inode\n' >&2
+            return 1
+        fi
+    fi
+
+    input_path=$input
+    while [ "$input_path" != / ] && [ "${input_path%/}" != "$input_path" ]; do
+        input_path=${input_path%/}
+    done
+    if [ "$input_path" = / ]; then
+        printf 'compress: refusing to archive the filesystem root\n' >&2
+        return 1
+    fi
+    input_dir=${input_path%/*}
+    [ "$input_dir" = "$input_path" ] && input_dir=.
+    input_name=${input_path##*/}
+    case "$input" in
+        [-@]*) input_operand="./$input" ;;
+        *) input_operand=$input ;;
+    esac
+    case "$output" in
+        [-@]*) output_template="./$output.tmpdir.XXXXXX" ;;
+        *) output_template="$output.tmpdir.XXXXXX" ;;
+    esac
+
+    case "$output" in
+        *.tar.bz2|*.tbz2|*.tar.gz|*.tgz|*.tar.xz|*.txz|*.tar.lz|*.tlz|*.tar.Z|*.tar|*.zip|*.rar|*.7z) ;;
+        *.gz|*.bz2|*.xz)
+            [ -f "$input" ] || {
+                printf 'compress: single-file format requires a regular file: %s\n' "$input" >&2
+                return 1
+            }
+            ;;
+        *.Z)
+            if ! command -v compress >/dev/null 2>&1; then
+                printf 'compress: the compress utility is unavailable for .Z output\n' >&2
+                return 1
+            fi
+            ;;
+        *)
+            printf 'compress: output extension must name a supported format: %s\n' "$output" >&2
+            return 1
+            ;;
+    esac
+
+    output_tmpdir=$(mktemp -d "$output_template") || {
+        printf 'compress: cannot create a temporary output beside %s\n' "$output" >&2
+        return 1
+    }
+    output_tmp="$output_tmpdir/${output##*/}"
+    case "$output_tmp" in
+        [-@]*) output_operand="./$output_tmp" ;;
+        *) output_operand=$output_tmp ;;
+    esac
+
+    case "$output" in
+        *.tar.bz2|*.tbz2) command tar -C "$input_dir" -cjf "$output_operand" -- "$input_name" ;;
+        *.tar.gz|*.tgz) command tar -C "$input_dir" -czf "$output_operand" -- "$input_name" ;;
+        *.tar.xz|*.txz) command tar -C "$input_dir" -cJf "$output_operand" -- "$input_name" ;;
+        *.tar.lz|*.tlz) command tar -C "$input_dir" --lzip -cf "$output_operand" -- "$input_name" ;;
+        *.tar.Z) command tar -C "$input_dir" -cZf "$output_operand" -- "$input_name" ;;
+        *.tar) command tar -C "$input_dir" -cf "$output_operand" -- "$input_name" ;;
+        *.zip) command zip -r "$output_operand" -- "$input_operand" ;;
+        *.rar) command rar a "$output_operand" "$input_operand" ;;
+        *.7z) command 7z a "$output_operand" -- "$input_operand" ;;
+        *.gz) command gzip -c -- "$input" > "$output_tmp" ;;
+        *.bz2) command bzip2 -c -- "$input" > "$output_tmp" ;;
+        *.xz) command xz -c -- "$input" > "$output_tmp" ;;
+        *.Z) command compress -c "$input_operand" > "$output_tmp" ;;
+    esac
+    result=$?
+    if [ "$result" -eq 0 ]; then
+        mv -f -- "$output_tmp" "$output"
+        result=$?
+    fi
+    rm -rf -- "$output_tmpdir"
+    return "$result"
+}
+
+wtnew() {
+    local branch=$1 base=${2:-HEAD} name result
+    if [ -z "$branch" ]; then
+        printf 'usage: wtnew BRANCH [BASE]\n' >&2
+        return 1
+    fi
+    name=${branch//\//-}
+    git worktree add "../_wt_$name" -b "$branch" "$base"
+    result=$?
+    return "$result"
+}
+
+wtgo() {
+    local branch=$1 target result
+    if [ -z "$branch" ]; then
+        printf 'usage: wtgo BRANCH\n' >&2
+        return 1
+    fi
+    target=$(git worktree list --porcelain | awk -v branch="refs/heads/$branch" '$1=="worktree" { wt=$2 } $1=="branch" && $2==branch { print wt; exit }')
+    if [ -z "$target" ]; then
+        printf 'no worktree found for branch: %s\n' "$branch" >&2
+        return 1
+    fi
+    cd -- "$target"
+    result=$?
+    return "$result"
+}
+
+wtnewgo() {
+    local branch=$1 base=${2:-HEAD} name target result
+    if [ -z "$branch" ]; then
+        printf 'usage: wtnewgo BRANCH [BASE]\n' >&2
+        return 1
+    fi
+    name=${branch//\//-}
+    target="../_wt_$name"
+    git worktree add "$target" -b "$branch" "$base" || return 1
+    cd -- "$target"
+    result=$?
+    return "$result"
+}

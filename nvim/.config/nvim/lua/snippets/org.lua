@@ -26,7 +26,7 @@ local parse = require("luasnip.util.parser").parse_snippet
 local ms = ls.multi_snippet
 local autosnippet = ls.extend_decorator.apply(s, { snippetType = "autosnippet" })
 
-M = {
+local M = {
 	-- Code Block
 	s(
 		{

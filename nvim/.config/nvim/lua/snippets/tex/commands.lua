@@ -45,7 +45,7 @@ local reference_snippet_table = {
 	r = "",
 }
 
-M = {
+local M = {
 	autosnippet(
 		{ trig = "alab", name = "label", dscr = "add a label" },
 		fmta(

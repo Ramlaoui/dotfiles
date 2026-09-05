@@ -46,7 +46,7 @@ local brackets = {
 	c = { "brace", "brace" },
 }
 
-M = {
+local M = {
 	autosnippet(
 		{ trig = "lr([aAbBc])", name = "left right", dscr = "left right delimiters", regTrig = true, hidden = true },
 		fmta(
@@ -55,12 +55,12 @@ M = {
     ]],
 			{
 				f(function(_, snip)
-					cap = snip.captures[1] or "p"
+					local cap = snip.captures[1] or "p"
 					return brackets[cap][1]
 				end),
 				d(1, scaffolding.get_visual),
 				f(function(_, snip)
-					cap = snip.captures[1] or "p"
+					local cap = snip.captures[1] or "p"
 					return brackets[cap][2]
 				end),
 				i(0),

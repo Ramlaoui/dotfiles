@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_dir="${CODEX_TMUX_SIDEBAR_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/codex-tmux-sidebar}"
+pending_file="$state_dir/pending.json"
+sessions_file="$state_dir/sessions.json"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+pending_max_age_seconds="${CODEX_TMUX_SIDEBAR_PENDING_MAX_AGE_SECONDS:-600}"
+
+# shellcheck source=tmux/.config/tmux/scripts/codex-tmux-sidebar-lock
+. "$script_dir/codex-tmux-sidebar-lock"
+
+update_pending_file() {
+  local cwd="$1" now="$2" token tmp
+  token="${BASHPID:-$$}:$now:${RANDOM:-0}"
+  codex_tmux_sidebar_prune_pending "$now" "$pending_max_age_seconds" || return 1
+  tmp="$(mktemp "$state_dir/.pending.json.XXXXXX")" || return 1
+  if ! jq \
+    --arg token "$token" \
+    --arg pane "$TMUX_PANE" \
+    --arg cwd "$cwd" \
+    --argjson now "$now" \
+    '[.[]] + [{token: $token, pane: $pane, cwd: $cwd, created_at: $now}]' \
+    "$pending_file" > "$tmp"; then
+    rm -f -- "$tmp"
+    codex_tmux_sidebar_error "refusing failed pending state update"
+    return 1
+  fi
+  mv -- "$tmp" "$pending_file" || { rm -f -- "$tmp"; return 1; }
+}
+
+record_pending_launch() {
+  command -v jq >/dev/null 2>&1 || {
+    codex_tmux_sidebar_error "jq is required for Codex pane association"
+    return 1
+  }
+  [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]] || return 0
+
+  local cwd now
+  cwd="$(pwd -P 2>/dev/null || pwd)"
+  now="$(date +%s)" || return 1
+  codex_tmux_sidebar_with_state_lock update_pending_file "$cwd" "$now"
+}
+
+record_pending_launch
+exec codex "$@"

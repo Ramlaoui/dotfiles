@@ -1,0 +1,121 @@
+#!/usr/bin/env zsh
+
+ssh_server() {
+    local server_name=$1 server_ip=$2 server_user=$3
+    local server_port=${4:-22} server_key=${5:-$HOME/.ssh/id_rsa}
+    local ssh_config=${SSH_CONFIG_FILE:-$HOME/.ssh/config}
+    if [[ -z "$server_name" || -z "$server_ip" || -z "$server_user" ]]; then
+        print -u2 'usage: ssh_server HOSTNAME ADDRESS USER [PORT] [IDENTITY_FILE]'
+        return 1
+    fi
+    mkdir -p -- "${ssh_config:h}" || return 1
+    {
+        print
+        print "Host $server_name"
+        print "    HostName $server_ip"
+        print "    Port $server_port"
+        print "    User $server_user"
+        print '    ForwardAgent yes'
+        print "    IdentityFile $server_key"
+    } >> "$ssh_config" || return 1
+    sscopy "$server_name"
+}
+
+codessh() {
+    if (( $# < 1 || $# > 2 )); then
+        print -u2 "usage: codessh USER@HOST [REMOTE_DIRECTORY]"
+        return 1
+    fi
+    local host=$1 dir=${2:-} new_dir
+    if [[ -z "$dir" ]]; then
+        new_dir=$(ssh "$host" 'cd ~ && pwd') || return 1
+    else
+        new_dir=$(ssh "$host" 'cd ~ && pwd') || return 1
+        new_dir="$new_dir/$dir"
+    fi
+    command code --remote "ssh-remote+$host" "$new_dir"
+}
+
+curssh() {
+    if (( $# < 1 || $# > 2 )); then
+        print -u2 "usage: curssh USER@HOST [REMOTE_DIRECTORY]"
+        return 1
+    fi
+    local host=$1 dir=${2:-} new_dir
+    if [[ -z "$dir" ]]; then
+        new_dir=$(ssh "$host" 'cd ~ && pwd') || return 1
+    else
+        new_dir=$(ssh "$host" 'cd ~ && pwd') || return 1
+        new_dir="$new_dir/$dir"
+    fi
+    command cursor --remote "ssh-remote+$host" "$new_dir"
+}
+
+_latex_copy_template() {
+    if (( $# != 2 )) || [[ -z "$2" || ! -d "$2" ]]; then
+        print -u2 'latex template directory is not configured or does not exist'
+        return 1
+    fi
+    local dest_dir=$1 template_dir=$2
+    mkdir -p -- "$dest_dir" || return 1
+    cp -R -- "$template_dir" "$dest_dir/"
+}
+
+latexnote() { _latex_copy_template "$1" "${LATEX_TEMPLATE_DIR:-}"; }
+latexbeamer() { _latex_copy_template "$1" "${LATEX_BEAMER_DIR:-}"; }
+latexcs() { _latex_copy_template "$1" "${LATEX_CS_DIR:-}"; }
+
+latexsnippets() {
+    command nvim "${XDG_CONFIG_HOME:-$HOME/.config}/nvim/my_snippets/tex.snippets"
+}
+
+
+tsplit() { tmux split-window -v "$@"; }
+tvsplit() { tmux split-window -h "$@"; }
+tresize() { tmux resize-pane -D "$@"; }
+tresizeh() { tmux resize-pane -R "$@"; }
+tresizev() { tmux resize-pane -U "$@"; }
+tresizeleft() { tmux resize-pane -L "$@"; }
+tresizeup() { tmux resize-pane -U "$@"; }
+tresizedown() { tmux resize-pane -D "$@"; }
+tresizeright() { tmux resize-pane -R "$@"; }
+
+_zsh_tmux_sidebar() {
+    local script="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/scripts/codex-sidebar"
+    if [[ ! -x "$script" ]]; then
+        print -u2 "codex sidebar helper is unavailable: $script"
+        return 127
+    fi
+    "$script" "$@"
+}
+
+codex-sidebar() { _zsh_tmux_sidebar "$@"; }
+codex() {
+    if [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
+        _zsh_tmux_sidebar "$@"
+    else
+        command codex "$@"
+    fi
+}
+
+rsync() {
+    local exclude=${XDG_CONFIG_HOME:-$HOME/.config}/rsync/.rsync.exclude
+    if [[ -r "$exclude" ]]; then
+        command rsync --exclude-from="$exclude" "$@"
+    else
+        command rsync "$@"
+    fi
+}
+
+rsyncgit() {
+    local exclude=${XDG_CONFIG_HOME:-$HOME/.config}/rsync/.rsync.exclude
+    if [[ -r "$exclude" ]]; then
+        command rsync --exclude-from="$exclude" --filter=':- .gitignore' "$@"
+    else
+        command rsync --filter=':- .gitignore' "$@"
+    fi
+}
+
+ccs_functions=${XDG_CONFIG_HOME:-$HOME/.config}/zsh/ccs_vscode_functions.zsh
+[[ -r "$ccs_functions" ]] && source -- "$ccs_functions"
+unset ccs_functions

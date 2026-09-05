@@ -29,15 +29,18 @@ pane_exists() {
   tmux display-message -p -t "$1" '#{pane_id}' >/dev/null 2>&1
 }
 
-# Prefer the binary path exported by the plugin. The fallback keeps the wrapper
-# usable if it is invoked before the plugin has populated @agent_sidebar_bin.
+# Prefer the binary path exported by the plugin, then a PATH-installed binary.
 plugin_bin="${TMUX_AGENT_SIDEBAR_BIN:-}"
 if [[ -z "$plugin_bin" ]]; then
   plugin_bin="$(tmux display-message -p '#{@agent_sidebar_bin}' 2>/dev/null || true)"
 fi
 if [[ -z "$plugin_bin" ]]; then
-  plugin_bin="$HOME/.config/tmux/plugins/tmux-agent-sidebar/bin/tmux-agent-sidebar"
+  plugin_bin="$(command -v tmux-agent-sidebar 2>/dev/null || true)"
 fi
+[[ -n "$plugin_bin" && -x "$plugin_bin" ]] || {
+  tmux display-message "tmux-agent-sidebar executable is unavailable"
+  exit 1
+}
 
 sidebar_pane="$(first_sidebar_pane)"
 if [[ -n "$sidebar_pane" ]]; then

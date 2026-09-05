@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Shared state/lock helpers for the Codex tmux sidebar bridge.
+#
+# State changes are serialized with an atomic mkdir lock.  The lock records the
+# owning process so an owner that was killed can be recovered safely without
+# deleting a live contender's lock.
+
+: "${state_dir:?state_dir must be set before sourcing codex-tmux-sidebar-lock}"
+lock_dir="${lock_dir:-$state_dir/lock.d}"
+pending_file="${pending_file:-$state_dir/pending.json}"
+sessions_file="${sessions_file:-$state_dir/sessions.json}"
+
+codex_tmux_sidebar_error() {
+  printf 'codex-tmux-sidebar: %s\n' "$*" >&2
+}
+
+codex_tmux_sidebar_proc_start() {
+  local pid="$1"
+  if [[ -r "/proc/$pid/stat" ]]; then
+    awk '{print $22}' "/proc/$pid/stat" 2>/dev/null || true
+  fi
+}
+
+codex_tmux_sidebar_read_owner() {
+  local key value
+  codex_tmux_sidebar_owner_pid=''
+  codex_tmux_sidebar_owner_host=''
+  codex_tmux_sidebar_owner_start=''
+  codex_tmux_sidebar_owner_token=''
+  [[ -f "$1" ]] || return 1
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
+    case "$key" in
+      pid) codex_tmux_sidebar_owner_pid="$value" ;;
+      host) codex_tmux_sidebar_owner_host="$value" ;;
+      start) codex_tmux_sidebar_owner_start="$value" ;;
+      token) codex_tmux_sidebar_owner_token="$value" ;;
+      '') : ;;
+      *) return 1 ;;
+    esac
+  done < "$1"
+  [[ "$codex_tmux_sidebar_owner_pid" =~ ^[0-9]+$ ]] || return 1
+  [[ -n "$codex_tmux_sidebar_owner_host" && -n "$codex_tmux_sidebar_owner_start" && -n "$codex_tmux_sidebar_owner_token" ]]
+}
+
+codex_tmux_sidebar_owner_is_stale() {
+  local owner_file="$1" current_start
+  codex_tmux_sidebar_read_owner "$owner_file" || return 1
+  [[ "$codex_tmux_sidebar_owner_host" == "$(hostname 2>/dev/null || printf unknown)" ]] || return 1
+  if ! kill -0 "$codex_tmux_sidebar_owner_pid" 2>/dev/null; then
+    return 0
+  fi
+  current_start="$(codex_tmux_sidebar_proc_start "$codex_tmux_sidebar_owner_pid")"
+  [[ -n "$current_start" && "$current_start" != "$codex_tmux_sidebar_owner_start" ]]
+}
+
+codex_tmux_sidebar_recover_stale_lock() {
+  local owner_file="$lock_dir/owner" recovery_dir
+  codex_tmux_sidebar_owner_is_stale "$owner_file" || return 1
+  recovery_dir="${lock_dir}.recovery.${BASHPID:-$$}.${RANDOM:-0}"
+  # Rename is atomic and only one contender can quarantine this lock.  Never
+  # recursively delete the lock directory: unexpected files remain for review.
+  if ! mv -- "$lock_dir" "$recovery_dir" 2>/dev/null; then
+    return 1
+  fi
+  rm -f -- "$recovery_dir/owner"
+  rmdir -- "$recovery_dir" 2>/dev/null || true
+  return 0
+}
+
+codex_tmux_sidebar_release_lock() {
+  local owner_file="$lock_dir/owner" recorded_token=''
+  [[ "${codex_tmux_sidebar_lock_owned:-0}" == 1 ]] || return 0
+  if codex_tmux_sidebar_read_owner "$owner_file"; then
+    recorded_token="$codex_tmux_sidebar_owner_token"
+  fi
+  if [[ "$recorded_token" == "${codex_tmux_sidebar_lock_token:-}" ]]; then
+    rm -f -- "$owner_file"
+    rmdir -- "$lock_dir" 2>/dev/null || true
+  fi
+  codex_tmux_sidebar_lock_owned=0
+}
+
+codex_tmux_sidebar_acquire_lock() {
+  local attempts=0 max_attempts="${CODEX_TMUX_SIDEBAR_LOCK_ATTEMPTS:-100}"
+  local sleep_seconds="${CODEX_TMUX_SIDEBAR_LOCK_SLEEP:-0.05}"
+  local owner_tmp host start
+
+  [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] || { codex_tmux_sidebar_error "invalid lock attempts: $max_attempts"; return 1; }
+  mkdir -p -- "$state_dir" || { codex_tmux_sidebar_error "cannot create state directory: $state_dir"; return 1; }
+  umask 077
+  while ! mkdir -- "$lock_dir" 2>/dev/null; do
+    if codex_tmux_sidebar_recover_stale_lock; then
+      continue
+    fi
+    attempts=$((attempts + 1))
+    if (( attempts >= max_attempts )); then
+      codex_tmux_sidebar_error "could not acquire state lock: $lock_dir"
+      return 1
+    fi
+    sleep "$sleep_seconds"
+  done
+
+  codex_tmux_sidebar_lock_token="${BASHPID:-$$}:$(date +%s%N 2>/dev/null || date +%s):${RANDOM:-0}"
+  host="$(hostname 2>/dev/null || printf unknown)"
+  start="$(codex_tmux_sidebar_proc_start "${BASHPID:-$$}")"
+  owner_tmp="$lock_dir/.owner.${codex_tmux_sidebar_lock_token}"
+  if ! { printf 'pid=%s\nhost=%s\nstart=%s\ntoken=%s\n' "${BASHPID:-$$}" "$host" "${start:-unknown}" "$codex_tmux_sidebar_lock_token" > "$owner_tmp" && mv -- "$owner_tmp" "$lock_dir/owner"; }; then
+    rm -f -- "$owner_tmp"
+    rmdir -- "$lock_dir" 2>/dev/null || true
+    codex_tmux_sidebar_error "cannot write state lock owner metadata"
+    return 1
+  fi
+  codex_tmux_sidebar_lock_owned=1
+  trap 'codex_tmux_sidebar_release_lock; exit 129' HUP
+  trap 'codex_tmux_sidebar_release_lock; exit 130' INT
+  trap 'codex_tmux_sidebar_release_lock; exit 143' TERM
+  trap 'codex_tmux_sidebar_release_lock' EXIT
+  return 0
+}
+
+codex_tmux_sidebar_atomic_jq() {
+  local target="$1" filter="$2" tmp
+  shift 2
+  tmp="$(mktemp "$state_dir/.$(basename "$target").XXXXXX")" || {
+    codex_tmux_sidebar_error "cannot create temporary state file for $target"
+    return 1
+  }
+  if ! jq "$@" "$filter" "$target" > "$tmp"; then
+    rm -f -- "$tmp"
+    codex_tmux_sidebar_error "refusing failed state update: $target"
+    return 1
+  fi
+  if ! mv -- "$tmp" "$target"; then
+    rm -f -- "$tmp"
+    codex_tmux_sidebar_error "cannot install state update: $target"
+    return 1
+  fi
+}
+
+codex_tmux_sidebar_state_init() {
+  local tmp
+  mkdir -p -- "$state_dir" || { codex_tmux_sidebar_error "cannot create state directory: $state_dir"; return 1; }
+  for target in "$pending_file" "$sessions_file"; do
+    [[ -e "$target" ]] && continue
+    tmp="$(mktemp "$state_dir/.$(basename "$target").XXXXXX")" || return 1
+    if [[ "$target" == "$pending_file" ]]; then
+      printf '[]\n' > "$tmp"
+    else
+      printf '{}\n' > "$tmp"
+    fi
+    mv -- "$tmp" "$target" || { rm -f -- "$tmp"; return 1; }
+  done
+  codex_tmux_sidebar_validate_state
+}
+
+codex_tmux_sidebar_validate_state() {
+  jq -e 'type == "array" and all(.[]; type == "object" and (.token|type) == "string" and (.pane|type) == "string" and (.cwd|type) == "string" and (.created_at|type) == "number")' "$pending_file" >/dev/null 2>&1 || {
+    codex_tmux_sidebar_error "malformed pending state; refusing to replace it: $pending_file"
+    return 1
+  }
+  jq -e 'type == "object" and all(to_entries[]; (.value|type) == "object" and (.value.pane|type) == "string" and (.value.cwd|type) == "string" and (.value.updated_at|type) == "number")' "$sessions_file" >/dev/null 2>&1 || {
+    codex_tmux_sidebar_error "malformed session state; refusing to replace it: $sessions_file"
+    return 1
+  }
+}
+
+codex_tmux_sidebar_prune_pending() {
+  local now="$1" max_age="$2"
+  codex_tmux_sidebar_atomic_jq "$pending_file" '[.[] | select(($now - .created_at) < $max_age)]' --argjson now "$now" --argjson max_age "$max_age"
+}
+
+codex_tmux_sidebar_with_state_lock() {
+  local status
+  codex_tmux_sidebar_acquire_lock || return 1
+  if ! codex_tmux_sidebar_state_init; then
+    codex_tmux_sidebar_release_lock
+    return 1
+  fi
+  "$@"; status=$?
+  codex_tmux_sidebar_release_lock
+  return "$status"
+}

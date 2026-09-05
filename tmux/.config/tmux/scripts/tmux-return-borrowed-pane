@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pane="${1:-$(tmux display-message -p '#{pane_id}')}"
+
+clear_origin() {
+  tmux set-option -pq -u -t "$pane" @borrowed_origin_window 2>/dev/null || true
+  tmux set-option -pq -u -t "$pane" @borrowed_origin_session 2>/dev/null || true
+  tmux set-option -pq -u -t "$pane" @borrowed_origin_label 2>/dev/null || true
+  tmux set-option -pq -u -t "$pane" @borrowed_origin_window_name 2>/dev/null || true
+}
+
+window_exists() {
+  tmux list-windows -a -F '#{window_id}' | grep -Fxq "$1"
+}
+
+session_exists() {
+  tmux list-sessions -F '#{session_id}' | grep -Fxq "$1"
+}
+
+origin_window="$(tmux show-options -pqv -t "$pane" @borrowed_origin_window 2>/dev/null || true)"
+origin_session="$(tmux show-options -pqv -t "$pane" @borrowed_origin_session 2>/dev/null || true)"
+origin_label="$(tmux show-options -pqv -t "$pane" @borrowed_origin_label 2>/dev/null || true)"
+origin_window_name="$(tmux show-options -pqv -t "$pane" @borrowed_origin_window_name 2>/dev/null || true)"
+
+if [[ -z "$origin_window" ]]; then
+  tmux break-pane -s "$pane"
+  exit 0
+fi
+
+if window_exists "$origin_window"; then
+  if ! output="$(tmux join-pane -s "$pane" -t "$origin_window" 2>&1)"; then
+    tmux display-message "return-pane failed: $output"
+    exit 1
+  fi
+  clear_origin
+  tmux display-message "returned pane to ${origin_label:-origin window}"
+  exit 0
+fi
+
+if [[ -n "$origin_session" ]] && session_exists "$origin_session"; then
+  window_name="${origin_window_name:-returned-pane}"
+  if ! output="$(tmux break-pane -s "$pane" -t "$origin_session:" -n "$window_name" 2>&1)"; then
+    tmux display-message "return-pane failed: $output"
+    exit 1
+  fi
+  clear_origin
+  tmux display-message "returned pane to ${origin_label:-origin session} as a new window"
+  exit 0
+fi
+
+if ! output="$(tmux break-pane -s "$pane" 2>&1)"; then
+  tmux display-message "break-pane failed: $output"
+  exit 1
+fi
+clear_origin

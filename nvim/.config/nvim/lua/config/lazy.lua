@@ -1,16 +1,38 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+local lazy_commit = "85c7ff3711b730b4030d03144f6db6375044ae82"
 
-if not (vim.uv or vim.loop).fs_stat(lazypath) then
+local function bootstrap_error(message)
+  error(("Unable to bootstrap lazy.nvim at %s:\n%s"):format(lazypath, message), 0)
+end
+
+local function valid_checkout()
+  if vim.fn.isdirectory(lazypath) ~= 1 then
+    return false
+  end
+  local git_dir = vim.fn.system({ "git", "-C", lazypath, "rev-parse", "--git-dir" })
+  if vim.v.shell_error ~= 0 or vim.trim(git_dir) == "" then
+    return false
+  end
+  return vim.fn.filereadable(lazypath .. "/lua/lazy/init.lua") == 1
+end
+
+if not valid_checkout() then
+  if (vim.uv or vim.loop).fs_stat(lazypath) then
+    bootstrap_error("the existing path is not a complete git checkout; remove it manually and retry")
+  end
+
   local lazyrepo = "https://github.com/folke/lazy.nvim.git"
-  local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
+  local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--no-checkout", lazyrepo, lazypath })
   if vim.v.shell_error ~= 0 then
-    vim.api.nvim_echo({
-      { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
-      { out, "WarningMsg" },
-      { "\nPress any key to exit..." },
-    }, true, {})
-    vim.fn.getchar()
-    os.exit(1)
+    bootstrap_error(out)
+  end
+
+  out = vim.fn.system({ "git", "-C", lazypath, "checkout", "--detach", lazy_commit })
+  if vim.v.shell_error ~= 0 then
+    bootstrap_error(out)
+  end
+  if not valid_checkout() then
+    bootstrap_error("the pinned commit did not produce a complete checkout")
   end
 end
 
