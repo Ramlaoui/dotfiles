@@ -52,10 +52,49 @@ boundaries and failure statuses. Git LFS is included because the Git configurati
 uses its filters. `uv` and `blesh` are optional.
 
 `--no-sudo` never invokes sudo. Missing tools without a supported local recipe fail
-explicitly rather than attempting a privileged installation. Local source recipes
-use pinned revisions and propagate build failures. It is not a promise that every
-core dependency can be installed without administrator access. Bootstrap scripts
-are not fetched and piped into a shell.
+explicitly rather than attempting a privileged installation. Stow and tmux delegate
+to the latest-release source installer below; other local recipes use pinned
+revisions. Build failures propagate. Not every core dependency has a local recipe.
+Bootstrap scripts are not fetched and piped into a shell.
+
+### Latest Stow and tmux from source (no sudo)
+
+```bash
+# Install both into ~/.local, even if older system versions exist.
+bash scripts/installs/source-tools.sh --jobs 4 all
+export PATH="$HOME/.local/bin:$PATH"
+stow --version
+tmux -V
+
+# Or select one tool / choose an installation prefix:
+bash scripts/installs/source-tools.sh stow
+bash scripts/installs/source-tools.sh --prefix "$HOME/local" --jobs 4 tmux
+```
+
+The installer discovers the latest stable official release at invocation time:
+GNU's release listings for Stow/ncurses and GitHub releases for tmux/libevent.
+It builds from release tarballs, not Git checkouts. This intentionally follows
+new stable releases rather than reproducing a fixed version.
+
+Stow needs **make, Perl, tar/gzip, curl or wget**, and ordinary Unix shell
+utilities. tmux additionally needs a **C compiler and its standard toolchain**.
+Linux needs a working compiler/libc development environment; macOS needs the
+Command Line Tools. Those basic prerequisites cannot be bootstrapped from nothing.
+No sudo, Git, autotools, pkg-config, Python, makeinfo, or preinstalled
+libevent/ncurses development packages are required. Missing m4/Bison parser tools
+are built locally when needed.
+
+tmux is linked with locally built static libevent and ncurses libraries, so no
+`LD_LIBRARY_PATH` setup is needed. Builds use private temporary directories and
+stage installation before copying into the chosen prefix. Failure before that
+copy leaves the prefix unchanged; the final copy is not an atomic transaction.
+The script never changes your shell configuration or restarts a running tmux.
+Downloads require network access and trust the official HTTPS distribution sites.
+
+The general `./install.sh deps --no-sudo stow tmux` path uses the same builder
+for missing tools. Use the standalone command above to upgrade an already
+installed version. Change PATH deliberately to select the new binaries.
+Prefixes must be absolute paths without whitespace (an upstream build limitation).
 
 ## Configuration ownership
 
