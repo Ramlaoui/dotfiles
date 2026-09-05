@@ -1,39 +1,38 @@
+.DEFAULT_GOAL := help
+.PHONY: install sync deps all dry-run no-sudo auto-yes help test
+
 install:
-	./install.sh
+	./install.sh all
 
-# Install with only stow, skipping dependencies
-stow-only:
-	./install.sh --stow-only
+sync:
+	./install.sh sync
 
-# Install without requiring sudo permissions
+dry-run:
+	./install.sh sync --dry-run
+
+deps:
+	./install.sh deps
+
+all:
+	./install.sh all
+
 no-sudo:
-	./install.sh --no-sudo
+	./install.sh deps --no-sudo
 
-# Install with automatic yes to all prompts
 auto-yes:
-	./install.sh --auto-yes
+	./install.sh deps --auto-yes
 
-# Install without changing the default shell
-no-shell-change:
-	./install.sh --skip-shell
-
-# Install with verbose output
-verbose:
-	./install.sh --verbose
-
-# Install with multiple options
-stow-and-no-sudo:
-	./install.sh --stow-only --no-sudo
+test:
+	python3 -m unittest discover -s tests -v
 
 help:
-	@echo "Available targets:"
-	@echo "  install         - Run the standard installation"
-	@echo "  stow-only       - Only apply 'stow' to the folders, skip dependencies installation"
-	@echo "  no-sudo         - Install packages from source without using sudo"
-	@echo "  auto-yes        - Automatically agree to all prompts"
-	@echo "  no-shell-change - Skip changing the default shell to zsh"
-	@echo "  verbose         - Show verbose output"
-	@echo "  stow-and-no-sudo - Apply stow only without sudo"
-	@echo "  help            - Display this help message"
-
-.PHONY: install stow-only no-sudo auto-yes no-shell-change verbose stow-and-no-sudo help
+	@printf '%s\n' \
+	  'Usage: make <target>' \
+	  '  sync       Preflight and link default dotfiles with GNU Stow' \
+	  '  dry-run    Show the sync plan without changing files' \
+	  '  deps       Install default dependencies' \
+	  '  all        Install dependencies, then sync default dotfiles' \
+	  '  no-sudo    Run deps without invoking sudo' \
+	  '  auto-yes   Run deps without prompting' \
+	  '  test       Run the Python unittest suite' \
+	  '  help       Show this help'

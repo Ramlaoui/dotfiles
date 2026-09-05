@@ -22,10 +22,6 @@ function cal_month() {
     cal $(date +"%m %Y")
 }
 
-# Edit bash configuration quickly
-function editrc() {
-    $EDITOR ~/.bashrc
-}
 
 # Backup a file with timestamp
 function backup_file() {
@@ -56,27 +52,6 @@ function man() {
         LESS_TERMCAP_so=$'\e[1;40;92m' \
         LESS_TERMCAP_ue=$'\e[0m' \
         LESS_TERMCAP_us=$'\e[1;32m' \
-        man "$@"
+        command man "$@"
 }
 
-# Extract archives of various types
-function extract_file() {
-    if [ -f "$1" ] ; then
-        case "$1" in
-            *.tar.bz2)   tar xjf "$1"     ;;
-            *.tar.gz)    tar xzf "$1"     ;;
-            *.bz2)       bunzip2 "$1"     ;;
-            *.rar)       unrar e "$1"     ;;
-            *.gz)        gunzip "$1"      ;;
-            *.tar)       tar xf "$1"      ;;
-            *.tbz2)      tar xjf "$1"     ;;
-            *.tgz)       tar xzf "$1"     ;;
-            *.zip)       unzip "$1"       ;;
-            *.Z)         uncompress "$1"  ;;
-            *.7z)        7z x "$1"        ;;
-            *)           echo "'$1' cannot be extracted via extract_file()" ;;
-        esac
-    else
-        echo "'$1' is not a valid file"
-    fi
-} 

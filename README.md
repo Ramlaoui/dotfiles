@@ -1,54 +1,107 @@
-## Dotfiles
+# Dotfiles
 
-This repository contains my dotfiles. I use [GNU Stow](https://www.gnu.org/software/stow/) to manage them.
-The goal is to keep the structure as simple as possible with only the necessary config files.
-It tries to achieve two main goals separately:
+Configuration packages managed with GNU Stow. Linking, dependency installation,
+and runtime activation are separate operations.
 
-- Import and sync the dotfiles easily on any machine.
-- Install the necessary packages and dependencies to make the dotfiles work.
-  This has to take into account:
-  - The operating system and the package manager available.
-  - The rights available to install packages and dependencies.
-
-### Installation
-
-To install the dotfiles, clone the repository and run the `install.sh` script.
-The script will install the necessary packages and dependencies and then use GNU Stow to symlink the dotfiles.
+## Install
 
 ```bash
-cd ~
-git clone
-cd dotfiles
-./install.sh
+git clone https://github.com/Ramlaoui/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./install.sh deps --auto-yes
+./install.sh sync --dry-run
+./install.sh sync
 ```
 
-### Structure
+`./install.sh` defaults to **sync only** and requires GNU Stow already in `PATH`.
+`./install.sh all` installs dependencies before linking the default packages.
+`make` shows help; `make sync`, `make deps`, and `make install` select these phases.
 
-The structure of the repository is as follows:
-
-Tree structure of the repository:
+Select packages or tools explicitly:
 
 ```bash
-.
-├── git/                  # Git configuration
-├── ghostty/              # Ghostty terminal configuration
-├── install.sh            # Main installation script
-├── macos/                # macOS specific configurations
-├── nvim/                 # Neovim configuration
-│   └── .config/
-│       └── nvim/
-├── python/               # Python environment setup
-├── README.md             # This documentation
-├── scripts/              # Installation and setup scripts
-│   ├── installs/         # Dependency installation scripts
-│   ├── linux/            # Linux-specific scripts
-│   └── macos/            # macOS-specific scripts
-├── tmux/                 # Tmux configuration
-├── todo.md               # Planned improvements
-└── zsh/                  # Zsh shell configuration
-    ├── .config/
-    ├── .inputrc
-    ├── .zpreztorc
-    ├── .zshrc
-    └── .zshrc.local
+./install.sh sync bash zsh tmux nvim git
+./install.sh deps git git-lfs jq stow
+./install.sh deps --no-sudo stow
+./install.sh sync --with-omarchy
 ```
+
+All selected destinations are checked before linking. Existing conflicting files
+are not adopted, overwritten, or deleted; a conflict or command failure exits
+nonzero. Move conflicting configuration aside deliberately, then retry. A dry-run
+creates no target directories. A failure during actual linking can leave earlier
+successful operations linked; correct the cause and rerun.
+
+Root files target `$HOME`; configuration subtrees target
+`${XDG_CONFIG_HOME:-$HOME/.config}`. macOS VS Code targets
+`~/Library/Application Support/Code`. Linux desktop packages are platform-gated.
+Codex, Zen, Doom, and WezTerm are optional and never selected by default. Selecting
+Bash or Zsh also links the shared `shell` package. Use `./install.sh --help` for
+package names and platform options.
+
+Sync does not delete plugin directories, source a running tmux session, change
+your login shell, install plugins, or apply desktop defaults. Restart applications
+or reload their configuration deliberately after reviewing the links. Shell
+plugins must be installed separately; shell startup never downloads them.
+
+## Dependencies
+
+`scripts/installs/core-dependency.sh --help` lists canonical tool names. Native
+package adapters translate them into platform package names and preserve argument
+boundaries and failure statuses. Git LFS is included because the Git configuration
+uses its filters. `uv` and `blesh` are optional.
+
+`--no-sudo` never invokes sudo. Missing tools without a supported local recipe fail
+explicitly rather than attempting a privileged installation. Local source recipes
+use pinned revisions and propagate build failures. It is not a promise that every
+core dependency can be installed without administrator access. Bootstrap scripts
+are not fetched and piped into a shell.
+
+## Configuration ownership
+
+- `shell/.config/shell/`: shared environment, aliases, and safe archive/temporary
+  directory helpers; Bash and Zsh startup files source these modules. Keep
+  machine-specific shell additions in your local startup override.
+- `git/.config/git/`: Git configuration, native global ignore, and credential
+  adapter. macOS Keychain or available libsecret is preferred; otherwise credentials
+  use memory-only caching. Existing plaintext credential files are **not deleted**:
+  migrate their secrets and remove obsolete copies yourself.
+- `python/.config/ruff/ruff.toml`: the single user-level Ruff configuration.
+  Project-local Ruff configuration still takes precedence.
+- `nvim/.config/nvim/`: tracked plugin lockfile, LuaSnip snippets, and the shared
+  Omarchy theme adapter. Launching Neovim can bootstrap the pinned lazy.nvim
+  revision and install missing plugins; sync itself does not run Neovim or install
+  its plugins. Lazy also checks for plugin updates.
+- `tmux/.config/tmux/scripts/`: installed sidebar/worktree and pane borrowing/return
+  helpers (tmux and fzf required for interactive pane selection). Optional
+  tmux-switcher configuration uses `TMUX_SWITCHER_PATH`, not a host-specific path.
+- `zen/.config/zen/README.md`: manual, locked profile patching and backup restoration.
+
+## Desktop safety
+
+Clipboard history is disabled unless `ROFI_CLIPBOARD_HISTORY=1` is exported.
+Enabled history uses private files, serialized atomic updates, and lossless
+multiline records. Base64 encoding is **not encryption**; retained clipboard
+content remains sensitive. Wayland uses `wl-clipboard`; X11 uses xclip or xsel.
+
+Process actions target the selected PID and verify its start identity. Logout
+addresses the current session only. Lock failure never falls back to suspend.
+Wi-Fi passwords are supplied on standard input rather than command arguments.
+Desktop utilities remain optional; install their platform dependencies explicitly.
+macOS defaults are a separate opt-in script and retain quarantine and disk-image
+verification protections. GNOME tiling tooling is installed manually, not at startup.
+
+The tmux copy-mode opener is intentionally unchanged, including its existing
+shell-interpolation risk. Do not use it with untrusted selections.
+
+## Verification
+
+```bash
+make test
+```
+
+Tests use disposable homes and stub external desktop/package-manager actions.
+Install Python 3, Bash, Zsh, GNU Stow, jq, Neovim, and Ruff to exercise the relevant
+checks; unavailable optional tools can produce skips. CI covers Linux and macOS.
+Tests do not install system packages, terminate your session, alter a browser
+profile, or reconfigure your running tmux server.

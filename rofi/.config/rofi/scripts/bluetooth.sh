@@ -1,121 +1,161 @@
 #!/bin/bash
 
-# Bluetooth manager using rofi and bluetoothctl
+set -u
 
-if ! command -v bluetoothctl &> /dev/null; then
-    rofi -e "bluetoothctl is required"
+show_error() {
+    rofi -e "$1" >&2 || printf '%s\n' "$1" >&2
+}
+
+if ! command -v bluetoothctl >/dev/null 2>&1; then
+    show_error "bluetoothctl is required."
     exit 1
 fi
 
-# Check if bluetooth service is running
-if ! systemctl is-active --quiet bluetooth; then
-    start_service=$(echo -e "Yes\nNo" | rofi -dmenu -p "Bluetooth service not running. Start it?")
+if command -v systemctl >/dev/null 2>&1 &&
+    ! systemctl is-active --quiet bluetooth; then
+    start_service=$(printf '%s\n' "Yes" "No" | rofi -dmenu -p "Bluetooth service not running. Start it?")
     if [[ "$start_service" == "Yes" ]]; then
-        systemctl start bluetooth
+        if ! systemctl start bluetooth; then
+            show_error "Unable to start the Bluetooth service."
+            exit 1
+        fi
     else
         exit 0
     fi
 fi
 
 get_bluetooth_status() {
-    if bluetoothctl show | grep -q "Powered: yes"; then
+    if bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then
         echo "on"
     else
         echo "off"
     fi
 }
 
-get_connected_devices() {
-    bluetoothctl devices Connected | while read -r line; do
-        mac=$(echo "$line" | awk '{print $2}')
-        name=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ $//')
-        echo "🔗 $name [$mac]"
-    done
+declare -a device_mac=()
+declare -a device_kind=()
+declare -a device_options=()
+device_id=0
+
+add_device() {
+    local kind="$1" mac="$2" name="$3" icon="$4"
+    [[ "$mac" =~ ^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$ ]] || return 0
+    device_mac[device_id]="$mac"
+    device_kind[device_id]="$kind"
+    device_options+=("$icon [$device_id] [$mac]")
+    ((device_id += 1))
 }
 
-get_paired_devices() {
-    bluetoothctl devices Paired | while read -r line; do
-        mac=$(echo "$line" | awk '{print $2}')
-        name=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ $//')
-        if ! bluetoothctl info "$mac" | grep -q "Connected: yes"; then
-            echo "📱 $name [$mac]"
-        fi
-    done
+get_devices() {
+    local filter="$1" kind="$2" icon="$3" line _ mac name
+    while IFS= read -r line; do
+        read -r _ mac name <<< "$line"
+        [[ -n "${mac:-}" ]] || continue
+        add_device "$kind" "$mac" "${name:-Unknown device}" "$icon"
+    done < <(bluetoothctl devices "$filter" 2>/dev/null)
 }
 
 scan_devices() {
+    local scan_pid
     bluetoothctl --timeout=10 scan on >/dev/null 2>&1 &
+    scan_pid=$!
+    # Give discovery a bounded window, then stop and reap exactly this scanner.
     sleep 2
-    bluetoothctl devices | while read -r line; do
-        mac=$(echo "$line" | awk '{print $2}')
-        name=$(echo "$line" | awk '{for(i=3;i<=NF;i++) printf "%s ", $i; print ""}' | sed 's/ $//')
-        if ! bluetoothctl devices Paired | grep -q "$mac"; then
-            echo "🔍 $name [$mac]"
+    if kill -0 "$scan_pid" 2>/dev/null; then
+        kill "$scan_pid" 2>/dev/null || true
+        wait "$scan_pid" 2>/dev/null || true
+    fi
+    bluetoothctl scan off >/dev/null 2>&1 || true
+
+    local line _ mac name
+    while IFS= read -r line; do
+        read -r _ mac name <<< "$line"
+        [[ -n "${mac:-}" ]] || continue
+        if ! bluetoothctl devices Paired 2>/dev/null | awk '{print $2}' | grep -Fxq "$mac"; then
+            add_device scan "$mac" "${name:-Unknown device}" "🔍"
         fi
-    done
+    done < <(bluetoothctl devices 2>/dev/null)
 }
 
 bt_status=$(get_bluetooth_status)
 
 if [[ "$bt_status" == "off" ]]; then
-    options="🔴 Bluetooth: OFF\n🔄 Turn On Bluetooth"
+    options=("🔴 Bluetooth: OFF" "🔄 Turn On Bluetooth")
 else
-    options="🟢 Bluetooth: ON\n⏹️  Turn Off Bluetooth\n🔍 Scan for Devices\n🔄 Refresh"
-    
-    connected=$(get_connected_devices)
-    if [[ -n "$connected" ]]; then
-        options+="\n--- Connected Devices ---\n$connected"
-    fi
-    
-    paired=$(get_paired_devices)
-    if [[ -n "$paired" ]]; then
-        options+="\n--- Paired Devices ---\n$paired"
-    fi
+    device_options=()
+    get_devices Connected connected "🔗"
+    get_devices Paired paired "📱"
+    options+=("${device_options[@]}")
 fi
 
-chosen=$(echo -e "$options" | rofi -dmenu -i -p "Bluetooth Manager")
+chosen=$(printf '%s\n' "${options[@]}" | rofi -dmenu -i -p "Bluetooth Manager")
 
-case $chosen in
+case "$chosen" in
     "🔄 Turn On Bluetooth")
-        bluetoothctl power on
-        rofi -e "Bluetooth enabled"
+        if bluetoothctl power on; then
+            rofi -e "Bluetooth enabled."
+        else
+            show_error "Unable to enable Bluetooth."
+            exit 1
+        fi
         ;;
     "⏹️  Turn Off Bluetooth")
-        bluetoothctl power off
-        rofi -e "Bluetooth disabled"
+        if bluetoothctl power off; then
+            rofi -e "Bluetooth disabled."
+        else
+            show_error "Unable to disable Bluetooth."
+            exit 1
+        fi
         ;;
     "🔍 Scan for Devices")
-        rofi -e "Scanning for devices..."
-        new_devices=$(scan_devices)
-        if [[ -n "$new_devices" ]]; then
-            selected=$(echo -e "$new_devices" | rofi -dmenu -i -p "New Devices Found")
-            if [[ -n "$selected" ]]; then
-                mac=$(echo "$selected" | grep -o '\[.*\]' | tr -d '[]')
-                action=$(echo -e "Pair\nConnect\nCancel" | rofi -dmenu -p "Action for device")
-                case $action in
-                    "Pair")
-                        bluetoothctl pair "$mac" && rofi -e "Device paired successfully"
-                        ;;
-                    "Connect")
-                        bluetoothctl connect "$mac" && rofi -e "Device connected successfully"
-                        ;;
-                esac
-            fi
-        else
-            rofi -e "No new devices found"
+        device_mac=()
+        device_kind=()
+        device_options=()
+        device_id=0
+        scan_devices
+        new_devices=("${device_options[@]}")
+        if ((${#new_devices[@]} == 0)); then
+            show_error "No new devices found."
+            exit 0
+        fi
+        selected=$(printf '%s\n' "${new_devices[@]}" | rofi -dmenu -i -p "New Devices Found")
+        if [[ "$selected" =~ ^🔍[[:space:]]\[([0-9]+)\][[:space:]]\[([[:xdigit:]:]+)\]$ ]]; then
+            id="${BASH_REMATCH[1]}"
+            mac="${device_mac[$id]:-}"
+            [[ "$mac" == "${BASH_REMATCH[2]}" ]] || {
+                show_error "The selected Bluetooth device changed; nothing was paired."
+                exit 1
+            }
+            action=$(printf '%s\n' "Pair" "Connect" "Cancel" | rofi -dmenu -p "Action for device")
+            case "$action" in
+                Pair)
+                    if bluetoothctl pair "$mac"; then rofi -e "Device paired successfully."; else show_error "Pairing failed."; exit 1; fi
+                    ;;
+                Connect)
+                    if bluetoothctl connect "$mac"; then rofi -e "Device connected successfully."; else show_error "Connection failed."; exit 1; fi
+                    ;;
+            esac
         fi
         ;;
     "🔄 Refresh")
         exec "$0"
         ;;
-    🔗*)
-        # Connected device - disconnect
-        mac=$(echo "$chosen" | grep -o '\[.*\]' | tr -d '[]')
-        bluetoothctl disconnect "$mac" && rofi -e "Device disconnected"
-        ;;
-    📱*)
-        # Paired device - connect
-        mac=$(echo "$chosen" | grep -o '\[.*\]' | tr -d '[]')
-        bluetoothctl connect "$mac" && rofi -e "Device connected"
+    *)
+        if [[ "$chosen" =~ \[([0-9]+)\][[:space:]]\[(([[:xdigit:]]{2}:){5}[[:xdigit:]]{2})\]$ ]]; then
+            id="${BASH_REMATCH[1]}"
+            mac="${device_mac[$id]:-}"
+            [[ "$mac" == "${BASH_REMATCH[2]}" ]] || {
+                show_error "The selected Bluetooth device changed; nothing was done."
+                exit 1
+            }
+            case "${device_kind[$id]:-}" in
+                connected)
+                    if bluetoothctl disconnect "$mac"; then rofi -e "Device disconnected."; else show_error "Disconnect failed."; exit 1; fi
+                    ;;
+                paired)
+                    if bluetoothctl connect "$mac"; then rofi -e "Device connected."; else show_error "Connection failed."; exit 1; fi
+                    ;;
+            esac
+        fi
         ;;
 esac

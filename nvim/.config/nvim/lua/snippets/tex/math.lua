@@ -79,7 +79,7 @@ local generate_cases = function(args, snip)
 	return sn(nil, nodes)
 end
 
-M = {
+local M = {
 	-- Math modes
 	autosnippet(
 		{ trig = "mk", name = "$..$", dscr = "inline math" },
@@ -174,7 +174,7 @@ M = {
 				end),
 				f(function(_, snip)
 					if snip.captures[4] == "a" then
-						out = string.rep("c", tonumber(snip.captures[3]) - 1)
+						local out = string.rep("c", tonumber(snip.captures[3]) - 1)
 						return "[" .. out .. "|c]"
 					end
 					return ""

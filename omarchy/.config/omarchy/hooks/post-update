@@ -5,9 +5,6 @@
 
 set -u
 
-dotfiles_dir="${DOTFILES_DIR:-$HOME/dotfiles}"
-nvim_source="$dotfiles_dir/nvim/.config/nvim"
-nvim_target="$HOME/.config/nvim"
 warned=0
 
 warn() {
@@ -15,61 +12,57 @@ warn() {
   printf 'Omarchy post-update warning: %s\n' "$1"
 }
 
-check_stowed_file() {
-  local rel_path=$1
-  local source_file="$nvim_source/$rel_path"
-  local target_file="$nvim_target/$rel_path"
-  local source_real
-  local target_real
+resolve_checkout() {
+  local hook_path
+  local candidate
 
-  # If this dotfiles checkout does not contain the file, it is not part of the
-  # Neovim ownership contract yet.
-  [[ -e "$source_file" ]] || return 0
-
-  if [[ ! -e "$target_file" ]]; then
-    warn "$target_file is missing"
+  hook_path=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null) || return 1
+  candidate=$(cd "$(dirname "$hook_path")/../../../.." 2>/dev/null && pwd -P) || return 1
+  if [[ -d "$candidate/.git" || -f "$candidate/.git" ]]; then
+    printf '%s\n' "$candidate"
     return 0
   fi
 
-  if [[ ! -L "$target_file" ]]; then
-    warn "$target_file is not a stow symlink"
+  # A copied hook has no repository-relative path. An explicit checkout path
+  # is supported, but there is deliberately no HOME/dotfiles default.
+  if [[ -n ${DOTFILES_DIR:-} ]] && [[ -d "$DOTFILES_DIR/.git" || -f "$DOTFILES_DIR/.git" ]]; then
+    printf '%s\n' "$(cd "$DOTFILES_DIR" && pwd -P)"
     return 0
   fi
+  return 1
+}
 
+dotfiles_dir=$(resolve_checkout 2>/dev/null || true)
+if [[ -z "$dotfiles_dir" ]]; then
+  warn "unable to resolve the dotfiles checkout from this hook"
+  exit 0
+fi
+
+nvim_source="$dotfiles_dir/nvim/.config/nvim"
+nvim_target="${XDG_CONFIG_HOME:-$HOME/.config}/nvim"
+if [[ ! -d "$nvim_source" ]]; then
+  warn "dotfiles checkout has no Neovim source directory: $nvim_source"
+  exit 0
+fi
+
+while IFS= read -r -d '' source_file; do
+  rel_path=${source_file#"$nvim_source"/}
+  target_file="$nvim_target/$rel_path"
   source_real=$(readlink -f "$source_file" 2>/dev/null || true)
   target_real=$(readlink -f "$target_file" 2>/dev/null || true)
 
-  if [[ "$source_real" != "$target_real" ]]; then
+  if [[ ! -e "$target_file" ]]; then
+    warn "$target_file is missing"
+  elif [[ ! -L "$target_file" ]]; then
+    warn "$target_file is not a stow symlink"
+  elif [[ "$source_real" != "$target_real" ]]; then
     warn "$target_file points to $target_real, expected $source_real"
   fi
-}
-
-check_stowed_file "init.lua"
-check_stowed_file "lazyvim.json"
-check_stowed_file "lua/config/lazy.lua"
-check_stowed_file "lua/config/options.lua"
-check_stowed_file "lua/config/keymaps.lua"
-check_stowed_file "lua/config/autocmds.lua"
-check_stowed_file "lua/plugins/diffview.lua"
+done < <(find "$nvim_source" -type f -print0)
 
 if [[ "$warned" -eq 1 ]]; then
-  cat <<EOF
-
-Omarchy may have replaced part of the dotfiles-owned Neovim config.
-Review the live config against the dotfiles copy:
-  diff -qr "$nvim_target" "$nvim_source"
-
-If this is the first Neovim stow migration, merge any live-only files into:
-  "$nvim_source"
-
-If Omarchy clobbered a previously stowed config, move the conflicting live files
-or the whole live config aside before restowing. Plain stow cannot overwrite real
-files:
-  mv "$nvim_target" "$nvim_target.pre-stow-\$(date +%Y%m%d%H%M%S)"
-  cd "$dotfiles_dir"
-  stow --no-folding -v -t "\$HOME" -R nvim
-
-EOF
+  printf '\nReview the live Neovim config against the checkout:\n'
+  printf '  diff -qr %q %q\n' "$nvim_target" "$nvim_source"
 fi
 
 exit 0

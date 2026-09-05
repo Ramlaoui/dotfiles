@@ -41,21 +41,13 @@ local single_command_snippet = require("snippets.tex.utils.scaffolding").single_
 local postfix_snippet = require("snippets.tex.utils.scaffolding").postfix_snippet
 
 -- fractions (parentheses case)
+local fraction = require("snippets.tex.utils.fraction")
 local generate_fraction = function(_, snip)
-	local stripped = snip.captures[1]
-	local depth = 0
-	local j = #stripped
-	while true do
-		local c = stripped:sub(j, j)
-		if c == "(" then
-			depth = depth + 1
-		elseif c == ")" then
-			depth = depth - 1
-		end
-		if depth == 0 then
-			break
-		end
-		j = j - 1
+	local stripped = snip.captures[1] or ""
+	local prefix, numerator = fraction.split(stripped)
+	if not prefix then
+		-- Keep malformed input intact instead of scanning past the beginning.
+		return sn(nil, t(stripped .. "/"))
 	end
 	return sn(
 		nil,
@@ -63,12 +55,12 @@ local generate_fraction = function(_, snip)
 			[[
         <>\frac{<>}{<>}
         ]],
-			{ t(stripped:sub(1, j - 1)), t(stripped:sub(j)), i(1) }
+			{ t(prefix), t(numerator), i(1) }
 		)
 	)
 end
 
-M = {
+local M = {
 	-- superscripts
 	autosnippet(
 		{ trig = "sr", wordTrig = false },

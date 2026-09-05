@@ -3,6 +3,7 @@
 # Configure rofi GNOME shortcuts
 
 set -e
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 
 # Function to switch to existing terminal window or launch new one
 switch_to_terminal() {
@@ -19,23 +20,24 @@ switch_to_terminal() {
 }
 
 # Function to switch to existing app window or launch if not running
-# Usage: switch_to_app <command> <window_class>
 switch_to_app() {
-    local COMMAND="$1"
-    local WINDOW_CLASS="$2"
-    
-    if [[ -z "$COMMAND" || -z "$WINDOW_CLASS" ]]; then
+    local command="$1"
+    local window_class="$2"
+
+    if [[ -z "$command" || -z "$window_class" ]]; then
         echo "Usage: switch_to_app <command> <window_class>"
         exit 1
     fi
-    
-    # Check if window exists and focus it
-    if wmctrl -l | grep -i "$WINDOW_CLASS" > /dev/null; then
-        # Window exists, focus it
-        wmctrl -a "$WINDOW_CLASS"
+    if [[ "$command" == *[!a-zA-Z0-9_./-]* ]]; then
+        echo "Refusing an unsafe application command: $command" >&2
+        exit 1
+    fi
+
+    # Check if window exists and focus it.
+    if wmctrl -l | grep -i -F -- "$window_class" > /dev/null; then
+        wmctrl -a "$window_class"
     else
-        # Window doesn't exist, launch the application
-        $COMMAND &
+        "$command" &
     fi
 }
 
@@ -55,37 +57,67 @@ echo "🔧 Configuring custom GNOME Shortcuts..."
 declare -A shortcuts=(
     ["rofi-launcher"]="<Shift><Control><Alt><Super>a|Rofi App Launcher|rofi -show drun"
     ["rofi-window"]="<Shift><Control><Alt><Super>w|Rofi Window Switcher|rofi -show window"
-    ["rofi-combined"]="<Shift><Control><Alt><Super>g|Rofi Combined Menu|$HOME/.config/rofi/scripts/combined-menu.sh"
-    ["terminal"]="<Shift><Control><Alt><Super>t|Switch to Terminal|$HOME/.config/gnome/setup-shortcuts.sh switch_to_terminal"
-    ["browser"]="<Shift><Control><Alt><Super>b|Switch to Browser|$HOME/.config/gnome/setup-shortcuts.sh switch_to_app google-chrome Chrome"
-    ["slack"]="<Shift><Control><Alt><Super>s|Switch to Slack|$HOME/.config/gnome/setup-shortcuts.sh switch_to_app slack Slack"
-    ["spotify"]="<Shift><Control><Alt><Super>p|Switch to Spotify|$HOME/.config/gnome/setup-shortcuts.sh switch_to_app spotify Spotify"
-    ["code"]="<Shift><Control><Alt><Super>k|Switch to Code|$HOME/.config/gnome/setup-shortcuts.sh switch_to_app code Code"
-    ["files"]="<Shift><Control><Alt><Super>f|Switch to Files|$HOME/.config/gnome/setup-shortcuts.sh switch_to_app nautilus Files"
+    ["rofi-combined"]="<Shift><Control><Alt><Super>g|Rofi Combined Menu|$CONFIG_HOME/rofi/scripts/combined-menu.sh"
+    ["terminal"]="<Shift><Control><Alt><Super>t|Switch to Terminal|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_terminal"
+    ["browser"]="<Shift><Control><Alt><Super>b|Switch to Browser|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_app google-chrome Chrome"
+    ["slack"]="<Shift><Control><Alt><Super>s|Switch to Slack|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_app slack Slack"
+    ["spotify"]="<Shift><Control><Alt><Super>p|Switch to Spotify|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_app spotify Spotify"
+    ["code"]="<Shift><Control><Alt><Super>k|Switch to Code|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_app code Code"
+    ["files"]="<Shift><Control><Alt><Super>f|Switch to Files|$CONFIG_HOME/gnome/setup-shortcuts.sh switch_to_app nautilus Files"
 )
 
-# Get current custom keybindings
-current_bindings=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)
+# Get current custom keybindings.  gsettings returns either [] or "@as []"
+# for an empty array; do not synthesize a malformed value with sed.
+if ! current_bindings=$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings); then
+    echo "Unable to read existing GNOME custom keybindings." >&2
+    exit 1
+fi
+case "$current_bindings" in
+    "[]"|"@as []")
+        new_bindings="[]"
+        ;;
+    \[*\]|@as\ \[*\])
+        new_bindings="${current_bindings#@as }"
+        ;;
+    *)
+        echo "Unsupported custom-keybindings value: $current_bindings" >&2
+        exit 1
+        ;;
+esac
+
+append_binding() {
+    local path="$1" inner
+    [[ "$new_bindings" == *"'$path'"* ]] && return 0
+    if [[ "$new_bindings" == "[]" ]]; then
+        new_bindings="['$path']"
+        return 0
+    fi
+    [[ "$new_bindings" == \[*\] ]] || return 1
+    inner="${new_bindings:1:${#new_bindings}-2}"
+    new_bindings="[$inner, '$path']"
+}
 
 # Setup each shortcut
 for id in "${!shortcuts[@]}"; do
     IFS='|' read -r binding name command <<< "${shortcuts[$id]}"
     path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/$id/"
-    
+
     echo "Setting up: $name ($binding)"
-    
-    # Set the shortcut properties
-    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$path name "$name"
-    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$path command "$command"
-    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$path binding "$binding"
-    
-    # Add to custom-keybindings list if not already present
-    if [[ ! "$current_bindings" =~ "$path" ]]; then
-        new_bindings=$(echo "$current_bindings" | sed "s|\]|,'$path'\]|")
-        gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_bindings"
-        current_bindings="$new_bindings"
-    fi
+
+    # Set only this shortcut's properties; unrelated GNOME settings remain
+    # untouched.
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$path" name "$name"
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$path" command "$command"
+    gsettings set org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:"$path" binding "$binding"
+    append_binding "$path" || {
+        echo "Unable to append custom keybinding $path." >&2
+        exit 1
+    }
 done
+
+if [[ "$new_bindings" != "${current_bindings#@as }" ]]; then
+    gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_bindings"
+fi
 
 echo "✅ All shortcuts configured successfully!"
 echo

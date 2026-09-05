@@ -1,0 +1,38 @@
+name: Dotfiles contracts
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install Linux verification tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y stow zsh lua5.1 jq
+      - name: Install macOS verification tools
+        if: runner.os == 'macOS'
+        run: brew install stow bash lua jq
+      - name: Set up isolated Neovim runtime
+        uses: rhysd/action-setup-vim@febef33995d6649302e9d88dda81e071b68f16a7 # v1
+        with:
+          neovim: true
+          version: v0.11.3
+      - name: Exercise filesystem and command contracts
+        run: make test
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'

@@ -1,12 +1,15 @@
 #!/bin/bash
 
-# Combined rofi menu - choose which mode to use
+set -u
+ROFI_SCRIPTS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/rofi/scripts"
+
+# Combined rofi menu - choose which mode to use.
 
 options="🚀 Applications (drun)\n🪟 Windows\n⚡ Run Command\n📁 Files\n💻 SSH\n🔌 Power Menu\n📶 WiFi\n📋 Clipboard\n🧮 Calculator\n😀 Emoji Picker\n📊 System Monitor\n🔵 Bluetooth\n⚙️  Settings"
 
-chosen=$(echo -e "$options" | rofi -dmenu -i -p "Rofi Menu" -theme-str 'window { width: 400px; }')
+chosen=$(printf '%b\n' "$options" | rofi -dmenu -i -p "Rofi Menu" -theme-str 'window { width: 400px; }')
 
-case $chosen in
+case "$chosen" in
     "🚀 Applications (drun)")
         rofi -show drun
         ;;
@@ -23,36 +26,36 @@ case $chosen in
         rofi -show ssh
         ;;
     "🔌 Power Menu")
-        ~/.config/rofi/scripts/power-menu.sh
+        "$ROFI_SCRIPTS_DIR/power-menu.sh"
         ;;
     "📶 WiFi")
-        ~/.config/rofi/scripts/wifi-menu.sh
+        "$ROFI_SCRIPTS_DIR/wifi-menu.sh"
         ;;
     "📋 Clipboard")
-        ~/.config/rofi/scripts/clipboard.sh
+        "$ROFI_SCRIPTS_DIR/clipboard.sh"
         ;;
     "🧮 Calculator")
-        ~/.config/rofi/scripts/calculator.sh
+        "$ROFI_SCRIPTS_DIR/calculator.sh"
         ;;
     "😀 Emoji Picker")
-        ~/.config/rofi/scripts/emoji.sh
+        "$ROFI_SCRIPTS_DIR/emoji.sh"
         ;;
     "📊 System Monitor")
-        ~/.config/rofi/scripts/system-monitor.sh
+        "$ROFI_SCRIPTS_DIR/system-monitor.sh"
         ;;
     "🔵 Bluetooth")
-        ~/.config/rofi/scripts/bluetooth.sh
+        "$ROFI_SCRIPTS_DIR/bluetooth.sh"
         ;;
     "⚙️  Settings")
-        # Open system settings
-        if command -v gnome-control-center &> /dev/null; then
+        # Open system settings.
+        if command -v gnome-control-center >/dev/null 2>&1; then
             gnome-control-center
-        elif command -v systemsettings5 &> /dev/null; then
+        elif command -v systemsettings5 >/dev/null 2>&1; then
             systemsettings5
-        elif command -v unity-control-center &> /dev/null; then
+        elif command -v unity-control-center >/dev/null 2>&1; then
             unity-control-center
         else
-            rofi -e "No settings application found"
+            rofi -e "No settings application found."
         fi
         ;;
 esac

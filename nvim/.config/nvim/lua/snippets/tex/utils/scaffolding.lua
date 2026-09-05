@@ -32,7 +32,7 @@ local parse = require("luasnip.util.parser").parse_snippet
 local ms = ls.multi_snippet
 local autosnippet = ls.extend_decorator.apply(s, { snippetType = "autosnippet" })
 
-M = {}
+local M = {}
 
 -- postfix helper function - generates dynamic node
 local generate_postfix_dynamicnode = function(_, parent, _, user_arg1, user_arg2)
@@ -107,8 +107,8 @@ M.symbol_snippet = function(context, command, opts)
 	context.name = context.name or command:gsub([[\]], "")
 	context.docstring = context.docstring or (command .. [[{0}]])
 	context.wordTrig = context.wordTrig or false
-	j, _ = string.find(command, context.trig)
-	if j == 2 then -- command always starts with backslash
+	local start = string.find(command, context.trig)
+	if start == 2 then -- command always starts with backslash
 		context.trigEngine = "ecma"
 		context.trig = "(?<!\\\\)" .. "(" .. context.trig .. ")"
 	end
@@ -136,6 +136,7 @@ end
 -- single command with option
 M.single_command_snippet = function(context, command, opts, ext)
 	opts = opts or {}
+	ext = ext or {}
 	if not context.trig then
 		error("context doesn't include a `trig` key which is mandatory", 2)
 	end
@@ -150,8 +151,8 @@ M.single_command_snippet = function(context, command, opts, ext)
 		docstring = [[{]] .. [[<1>]] .. [[}]] .. [[<0>]]
 	end
 	if ext.label == true then
-		docstring = [[{]] .. [[<1>]] .. [[}]] .. [[\label{(]] .. ext.short .. [[:<2>)?}]] .. [[<0>]]
 		ext.short = ext.short or command
+		docstring = [[{]] .. [[<1>]] .. [[}]] .. [[\label{(]] .. ext.short .. [[:<2>)?}]] .. [[<0>]]
 		lnode = c(2 + (offset or 0), {
 			t(""),
 			sn(
@@ -166,8 +167,8 @@ M.single_command_snippet = function(context, command, opts, ext)
 		})
 	end
 	context.docstring = context.docstring or (command .. docstring)
-	j, _ = string.find(command, context.trig)
-	if j == 2 then
+	local start = string.find(command, context.trig)
+	if start == 2 then
 		context.trigEngine = "ecma"
 		context.trig = "(?<!\\\\)" .. "(" .. context.trig .. ")"
 		context.hidden = true
@@ -189,8 +190,8 @@ M.postfix_snippet = function(context, command, opts)
 	context.name = context.name or context.dscr
 	context.docstring = command.pre .. [[(POSTFIX_MATCH|VISUAL|<1>)]] .. command.post
 	context.match_pattern = [[[%w%.%_%-%"%']*$]]
-	j, _ = string.find(command.pre, context.trig)
-	if j == 2 then
+	local start = string.find(command.pre, context.trig)
+	if start == 2 then
 		context.trigEngine = "ecma"
 		context.trig = "(?<!\\\\)" .. "(" .. context.trig .. ")"
 		context.hidden = true

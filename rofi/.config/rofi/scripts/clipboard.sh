@@ -1,75 +1,112 @@
 #!/bin/bash
 
-# Enhanced clipboard manager with persistent history
-# Requires xclip
+set -u
+set -o pipefail
 
-HISTORY_FILE="$HOME/.cache/rofi-clipboard-history"
-MAX_HISTORY=50
+# Retention is deliberately opt-in.  Opening this menu never records the
+# current clipboard unless the user explicitly enables the variable.
+RETENTION_ENABLED="${ROFI_CLIPBOARD_HISTORY:-0}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+HISTORY_FILE="${ROFI_CLIPBOARD_HISTORY_FILE:-${XDG_CACHE_HOME:-$HOME/.cache}/rofi/clipboard-history.json}"
+HISTORY_HELPER="$SCRIPT_DIR/clipboard-history.py"
 
-if ! command -v xclip &> /dev/null; then
-    rofi -e "xclip is required for this script"
-    exit 1
-fi
+show_error() {
+    rofi -e "$1" >&2 || printf '%s\n' "$1" >&2
+}
 
-# Create cache directory if it doesn't exist
-mkdir -p "$(dirname "$HISTORY_FILE")"
-
-# Function to add to history
-add_to_history() {
-    local content="$1"
-    if [[ -n "$content" && ${#content} -gt 1 ]]; then
-        # Remove duplicates and add to top
-        grep -Fxv "$content" "$HISTORY_FILE" 2>/dev/null > "${HISTORY_FILE}.tmp" || true
-        echo "$content" > "$HISTORY_FILE"
-        head -n $((MAX_HISTORY-1)) "${HISTORY_FILE}.tmp" 2>/dev/null >> "$HISTORY_FILE" || true
-        rm -f "${HISTORY_FILE}.tmp"
+clipboard_reader() {
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-paste >/dev/null 2>&1; then
+        wl-paste --no-newline
+    elif command -v xclip >/dev/null 2>&1; then
+        xclip -o -selection clipboard
+    elif command -v xsel >/dev/null 2>&1; then
+        xsel --clipboard --output
+    else
+        return 1
     fi
 }
 
-# Monitor clipboard and add new content to history
-current_clip=$(xclip -o -selection clipboard 2>/dev/null)
-if [[ -n "$current_clip" ]]; then
-    add_to_history "$current_clip"
-fi
+clipboard_writer() {
+    if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy >/dev/null 2>&1; then
+        wl-copy --type 'text/plain;charset=utf-8'
+    elif command -v xclip >/dev/null 2>&1; then
+        xclip -selection clipboard
+    elif command -v xsel >/dev/null 2>&1; then
+        xsel --clipboard --input
+    else
+        return 1
+    fi
+}
 
-# Build options from history
-options="🗑️  Clear History\n"
-if [[ -f "$HISTORY_FILE" ]]; then
-    while IFS= read -r line; do
-        if [[ -n "$line" ]]; then
-            # Show first 60 chars, replace newlines with ↵
-            display_line=$(echo "$line" | tr '\n' '↵' | cut -c1-60)
-            if [[ ${#line} -gt 60 ]]; then
-                display_line="${display_line}..."
-            fi
-            options+="📋 $display_line\n"
-        fi
-    done < "$HISTORY_FILE"
+if [[ ! -x "$HISTORY_HELPER" ]]; then
+    show_error "Clipboard history needs an executable Python 3 helper."
+    exit 1
 fi
-
-if [[ $(echo -e "$options" | wc -l) -eq 1 ]]; then
-    rofi -e "No clipboard history found"
+if ! command -v python3 >/dev/null 2>&1; then
+    show_error "python3 is required for private clipboard history."
+    exit 1
+fi
+if [[ "$RETENTION_ENABLED" != "1" && ! -e "$HISTORY_FILE" ]]; then
+    show_error "Clipboard history is empty (set ROFI_CLIPBOARD_HISTORY=1 to retain entries)."
     exit 0
 fi
 
-chosen=$(echo -e "$options" | rofi -dmenu -i -p "Clipboard History" -format "s")
-
-if [[ "$chosen" == "🗑️  Clear History" ]]; then
-    rm -f "$HISTORY_FILE"
-    rofi -e "Clipboard history cleared"
-elif [[ "$chosen" == 📋* ]]; then
-    # Extract the original content from history file
-    display_text="${chosen#📋 }"
-    # Find matching line in history file
-    while IFS= read -r line; do
-        line_display=$(echo "$line" | tr '\n' '↵' | cut -c1-60)
-        if [[ ${#line} -gt 60 ]]; then
-            line_display="${line_display}..."
-        fi
-        if [[ "$line_display" == "${display_text}" ]]; then
-            echo -n "$line" | xclip -selection clipboard
-            echo -n "$line" | xclip -selection primary
-            break
-        fi
-    done < "$HISTORY_FILE"
+if [[ "$RETENTION_ENABLED" == "1" ]]; then
+    if ! clipboard_reader | python3 "$HISTORY_HELPER" add "$HISTORY_FILE"; then
+        show_error "Unable to read or retain the current clipboard."
+        exit 1
+    fi
 fi
+
+if ! history_output=$(python3 "$HISTORY_HELPER" list "$HISTORY_FILE"); then
+    show_error "Unable to read clipboard history."
+    exit 1
+fi
+history_entries=()
+if [[ -n "$history_output" ]]; then
+    mapfile -t history_entries <<< "$history_output"
+fi
+
+options=("🗑️  Clear History")
+declare -A entry_tokens=()
+for entry in "${history_entries[@]}"; do
+    token="${entry%%$'\t'*}"
+    display="${entry#*$'\t'}"
+    [[ -n "$token" && "$entry" == *$'\t'* ]] || continue
+    entry_tokens["$token"]=1
+    options+=("📋 [$token] $display")
+done
+
+if ((${#options[@]} == 1)); then
+    if [[ "$RETENTION_ENABLED" == "1" ]]; then
+        show_error "No clipboard history found."
+    else
+        show_error "Clipboard history is empty (set ROFI_CLIPBOARD_HISTORY=1 to retain entries)."
+    fi
+    exit 0
+fi
+
+printf '%s\n' "${options[@]}" | rofi -dmenu -i -p "Clipboard History" -format s | {
+    IFS= read -r chosen || exit 0
+    if [[ "$chosen" == "🗑️  Clear History" ]]; then
+        if python3 "$HISTORY_HELPER" clear "$HISTORY_FILE"; then
+            rofi -e "Clipboard history cleared."
+        else
+            show_error "Unable to clear clipboard history."
+            exit 1
+        fi
+        exit 0
+    fi
+
+    if [[ "$chosen" =~ ^📋[[:space:]]\[([0-9a-f]{64})\][[:space:]] ]]; then
+        token="${BASH_REMATCH[1]}"
+        [[ -n "${entry_tokens[$token]:-}" ]] || {
+            show_error "The selected clipboard entry is no longer available."
+            exit 1
+        }
+        if ! python3 "$HISTORY_HELPER" get "$HISTORY_FILE" "$token" | clipboard_writer; then
+            show_error "The selected clipboard entry could not be copied."
+            exit 1
+        fi
+    fi
+}

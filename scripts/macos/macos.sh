@@ -3,22 +3,32 @@
 # Modified from http://mths.be/osx.
 # and https://github.com/bamos/dotfiles/blob/master/.osx
 
-# Run this to configure Mac settings.
+# Run this to configure Mac settings.  This is intentionally fail-fast:
+# supported settings must either apply or make the invocation non-zero.
+set -Eeuo pipefail
+trap 'status=$?; printf "macos.sh: command failed at line %s (status %s)\n" "$LINENO" "$status" >&2; exit "$status"' ERR
 
-# Ask for the administrator password upfront
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    printf 'macos.sh only supports Darwin; refusing to run on this host.\n' >&2
+    exit 1
+fi
+
+# Ask for the administrator password upfront.  Every privileged command below
+# still reports its own failure; no command is silently swallowed.
 sudo -v
-
-# Keep-alive: update existing `sudo` time stamp until `.osx` has finished
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 
 # === General UI/UX ===
 
-# Set standby delay to 24 hours (default is 1 hour)
-sudo pmset -a standbydelay 86400
+# Power/NVRAM tweaks are host-specific; leave them disabled in the shared
+# profile unless explicitly requested for a supported machine.
+if [[ "${MACOS_ENABLE_POWER_TWEAKS:-0}" == "1" ]]; then
+    # Set standby delay to 24 hours (default is 1 hour).
+    sudo pmset -a standbydelay 86400
 
-# Disable the sound effects on boot
-sudo nvram SystemAudioVolume=" "
+    # Disable the sound effects on boot.
+    sudo nvram SystemAudioVolume=" "
+fi
 
 # Menu bar: enable transparency
 defaults write NSGlobalDomain AppleEnableMenuBarTransparency -bool true
@@ -63,8 +73,6 @@ defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool true
 # Automatically quit printer app once the print jobs complete
 defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
 
-# Disable the “Are you sure you want to open this application?” dialog
-defaults write com.apple.LaunchServices LSQuarantine -bool false
 
 # Display ASCII control characters using caret notation in standard text views
 # Try e.g. `cd /tmp; unidecode "\x{0000}" > cc.txt; open -e cc.txt`
@@ -73,8 +81,6 @@ defaults write NSGlobalDomain NSTextShowsControlCharacters -bool true
 # Disable Resume system-wide
 defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
 
-# Disable automatic termination of inactive apps
-defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
 
 # Set Help Viewer windows to non-floating mode
 defaults write com.apple.helpviewer DevMode -bool true
@@ -83,14 +89,11 @@ defaults write com.apple.helpviewer DevMode -bool true
 # in the login window
 sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
 
-# Restart automatically if the computer freezes
-systemsetup -setrestartfreeze on
-
-# Go into computer sleep mode
-systemsetup -setcomputersleep On > /dev/null
-
-# Check for software updates daily, not just once per week
-# defaults write com.apple.SoftwareUpdate ScheduleFrequency -int 1
+# Power policy changes are machine-wide and opt-in.
+if [[ "${MACOS_ENABLE_POWER_TWEAKS:-0}" == "1" ]]; then
+    systemsetup -setrestartfreeze on
+    systemsetup -setcomputersleep On > /dev/null
+fi
 
 # Enable Notification Center.
 # launchctl load -w /System/Library/LaunchAgents/com.apple.notificationcenterui.plist 2> /dev/null
@@ -102,16 +105,18 @@ defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
 defaults write NSGlobalDomain NSAutomaticDashSubstitutionEnabled -bool false
 
 
-# === SSD-specific tweaks ===
+# These changes are hardware-specific and are opt-in rather than part of the
+# portable profile.
+if [[ "${MACOS_ENABLE_SSD_TWEAKS:-0}" == "1" ]]; then
+    # Disable local Time Machine snapshots.
+    sudo tmutil disablelocal
 
-# Disable local Time Machine snapshots
-sudo tmutil disablelocal
+    # Enable hibernation.
+    sudo pmset -a hibernatemode 0
 
-# Enable hibernation
-sudo pmset -a hibernatemode 0
-
-# Disable the sudden motion sensor as it’s not useful for SSDs
-sudo pmset -a sms 0
+    # Disable the sudden motion sensor (only appropriate on supported SSD Macs).
+    sudo pmset -a sms 0
+fi
 
 
 # === Trackpad, mouse, keyboard, Bluetooth accessories, and input ===
@@ -186,8 +191,10 @@ defaults write com.apple.screencapture disable-shadow -bool true
 # Enable subpixel font rendering on non-Apple LCDs
 defaults write NSGlobalDomain AppleFontSmoothing -int 2
 
-# Enable HiDPI display modes (requires restart)
-sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
+if [[ "${MACOS_ENABLE_DISPLAY_TWEAKS:-0}" == "1" ]]; then
+    # HiDPI is not appropriate for every display; opt in on supported Macs.
+    sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
+fi
 
 
 # === Finder ===
@@ -242,10 +249,6 @@ defaults write NSGlobalDomain com.apple.springing.delay -float 0
 # Avoid creating .DS_Store files on network volumes
 defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
 
-# Disable disk image verification
-defaults write com.apple.frameworks.diskimages skip-verify -bool true
-defaults write com.apple.frameworks.diskimages skip-verify-locked -bool true
-defaults write com.apple.frameworks.diskimages skip-verify-remote -bool true
 
 # Automatically open a new Finder window when a volume is mounted
 defaults write com.apple.frameworks.diskimages auto-open-ro-root -bool true
@@ -285,11 +288,12 @@ defaults write com.apple.finder WarnOnEmptyTrash -bool false
 # Empty Trash securely by default
 defaults write com.apple.finder EmptyTrashSecurely -bool true
 
-# Enable AirDrop over Ethernet and on unsupported Macs running Lion
-defaults write com.apple.NetworkBrowser BrowseAllInterfaces -bool true
-
-# Enable the MacBook Air SuperDrive on any Mac
-sudo nvram boot-args="mbasd=1"
+if [[ "${MACOS_ENABLE_LEGACY_HARDWARE:-0}" == "1" ]]; then
+    # These settings target unsupported/legacy hardware and are never global
+    # profile defaults.
+    defaults write com.apple.NetworkBrowser BrowseAllInterfaces -bool true
+    sudo nvram boot-args="mbasd=1"
+fi
 
 # Show the ~/Library folder
 chflags nohidden ~/Library
@@ -367,8 +371,10 @@ defaults write com.apple.dock showhidden -bool true
 # Make Dock more transparent
 defaults write com.apple.dock hide-mirror -bool true
 
-# Reset Launchpad, but keep the desktop wallpaper intact
-find "${HOME}/Library/Application Support/Dock" -name "*-*.db" -maxdepth 1 -delete
+if [[ "${MACOS_RESET_LAUNCHPAD:-0}" == "1" ]]; then
+    # Deleting Launchpad state is destructive, so require explicit opt-in.
+    find "${HOME}/Library/Application Support/Dock" -maxdepth 1 -name "*-*.db" -delete
+fi
 
 # Add a spacer to the left side of the Dock (where the applications are)
 #defaults write com.apple.dock persistent-apps -array-add '{tile-data={}; tile-type="spacer-tile";}'
@@ -461,36 +467,32 @@ defaults write com.apple.mail SpellCheckingBehavior -string "NoSpellCheckingEnab
 
 # === Spotlight ===
 
-# Hide Spotlight tray-icon (and subsequent helper)
-#sudo chmod 600 /System/Library/CoreServices/Search.bundle/Contents/MacOS/Search
-# Disable Spotlight indexing for any volume that gets mounted and has not yet
-# been indexed before.
-# Use `sudo mdutil -i off "/Volumes/foo"` to stop indexing any volume.
-sudo defaults write /.Spotlight-V100/VolumeConfiguration Exclusions -array "/Volumes"
-# Change indexing order and disable some file types
-defaults write com.apple.spotlight orderedItems -array \
-	'{"enabled" = 1;"name" = "APPLICATIONS";}' \
-	'{"enabled" = 1;"name" = "SYSTEM_PREFS";}' \
-	'{"enabled" = 1;"name" = "DIRECTORIES";}' \
-	'{"enabled" = 1;"name" = "PDF";}' \
-	'{"enabled" = 1;"name" = "FONTS";}' \
-	'{"enabled" = 0;"name" = "DOCUMENTS";}' \
-	'{"enabled" = 0;"name" = "MESSAGES";}' \
-	'{"enabled" = 0;"name" = "CONTACT";}' \
-	'{"enabled" = 0;"name" = "EVENT_TODO";}' \
-	'{"enabled" = 0;"name" = "IMAGES";}' \
-	'{"enabled" = 0;"name" = "BOOKMARKS";}' \
-	'{"enabled" = 0;"name" = "MUSIC";}' \
-	'{"enabled" = 0;"name" = "MOVIES";}' \
-	'{"enabled" = 0;"name" = "PRESENTATIONS";}' \
-	'{"enabled" = 0;"name" = "SPREADSHEETS";}' \
-	'{"enabled" = 0;"name" = "SOURCE";}'
-# Load new settings before rebuilding the index
-killall mds > /dev/null 2>&1
-# Make sure indexing is enabled for the main volume
-sudo mdutil -i on / > /dev/null
-# Rebuild the index from scratch
-sudo mdutil -E / > /dev/null
+if [[ "${MACOS_ENABLE_SPOTLIGHT_REBUILD:-0}" == "1" ]]; then
+    # Spotlight changes affect the whole host and are opt-in.
+    sudo defaults write /.Spotlight-V100/VolumeConfiguration Exclusions -array "/Volumes"
+    defaults write com.apple.spotlight orderedItems -array \
+        '{"enabled" = 1;"name" = "APPLICATIONS";}' \
+        '{"enabled" = 1;"name" = "SYSTEM_PREFS";}' \
+        '{"enabled" = 1;"name" = "DIRECTORIES";}' \
+        '{"enabled" = 1;"name" = "PDF";}' \
+        '{"enabled" = 1;"name" = "FONTS";}' \
+        '{"enabled" = 0;"name" = "DOCUMENTS";}' \
+        '{"enabled" = 0;"name" = "MESSAGES";}' \
+        '{"enabled" = 0;"name" = "CONTACT";}' \
+        '{"enabled" = 0;"name" = "EVENT_TODO";}' \
+        '{"enabled" = 0;"name" = "IMAGES";}' \
+        '{"enabled" = 0;"name" = "BOOKMARKS";}' \
+        '{"enabled" = 0;"name" = "MUSIC";}' \
+        '{"enabled" = 0;"name" = "MOVIES";}' \
+        '{"enabled" = 0;"name" = "PRESENTATIONS";}' \
+        '{"enabled" = 0;"name" = "SPREADSHEETS";}' \
+        '{"enabled" = 0;"name" = "SOURCE";}'
+    if pgrep -x mds >/dev/null 2>&1; then
+        killall mds
+    fi
+    sudo mdutil -i on / > /dev/null
+    sudo mdutil -E / > /dev/null
+fi
 
 
 # === Terminal & iTerm 2 ===
@@ -553,8 +555,11 @@ defaults write com.apple.messageshelper.MessageController SOInputLineSettings -d
 # === Kill affected applications ===
 
 for app in "Activity Monitor" "Address Book" "Calendar" "Contacts" "cfprefsd" \
-	"Dock" "Finder" "Mail" "Messages" "Safari" "SizeUp" "SystemUIServer" \
-	"Terminal" "Transmission" "Twitter" "iCal"; do
-	killall "${app}" > /dev/null 2>&1
+    "Dock" "Finder" "Mail" "Messages" "Safari" "SizeUp" "SystemUIServer" \
+    "Terminal" "Transmission" "Twitter" "iCal"; do
+    # Not running is expected; an actual kill failure remains fatal.
+    if pgrep -x "$app" >/dev/null 2>&1; then
+        killall "$app" > /dev/null
+    fi
 done
 echo "Done. Note that some of these changes require a logout/restart to take effect."
