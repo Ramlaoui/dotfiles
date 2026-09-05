@@ -14,11 +14,13 @@ set -o pipefail
 
 PURPLE='\033[0;35m'
 YELLOW='\033[0;33m'
+PROGRAM=${0##*/}
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_DIR=${SCRIPT_PATH%/*}
 [ "$SCRIPT_DIR" = "$SCRIPT_PATH" ] && SCRIPT_DIR=.
 SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" 2>/dev/null && pwd -P)" || exit 1
-SOURCE_INSTALLER="$SCRIPT_DIR/source-tools.sh"
+SOURCE_STOW_INSTALLER="$SCRIPT_DIR/../misc/install_stow.sh"
+SOURCE_TMUX_INSTALLER="$SCRIPT_DIR/../misc/install_tmux.sh"
 
 RESET='\033[0m'
 
@@ -37,7 +39,7 @@ SPECIFIC_PACKAGES=()
 
 print_usage() {
     cat <<EOF
-Usage: $(basename "$0") [options] [tool ...]
+Usage: $PROGRAM [options] [tool ...]
 
 Install dependencies using the native package manager.  Tool names are
 canonical command names; platform package names are selected automatically.
@@ -210,16 +212,25 @@ is_tool_installed() {
     fi
     command -v "$(command_for_tool "$tool")" >/dev/null 2>&1
 }
-# User-local source recipes are deliberately few.  Stow and tmux are handled by
-# source-tools.sh, which discovers current stable release archives and performs
-# its own selection-specific prerequisite checks.  The other recipes remain
-# pinned because they are unrelated to this source bootstrap.
+# User-local source recipes are deliberately few. Stow and tmux are handled by
+# their matching standalone entrypoints. The other recipes remain pinned
+# because they are unrelated to this source bootstrap.
+local_source_installer() {
+    case "$1" in
+        stow) printf '%s\n' "$SOURCE_STOW_INSTALLER" ;;
+        tmux) printf '%s\n' "$SOURCE_TMUX_INSTALLER" ;;
+        *) return 1 ;;
+    esac
+}
+
 local_recipe_supported() {
     local tool="$1"
+    local installer
     case "$tool" in
         stow|tmux)
-            if [ ! -x "$SOURCE_INSTALLER" ]; then
-                printf '%s\n' "No supported source installer for $tool: $SOURCE_INSTALLER" >&2
+            installer="$(local_source_installer "$tool")"
+            if [ ! -x "$installer" ]; then
+                printf '%s\n' "No supported source installer for $tool: $installer" >&2
                 return 1
             fi
             ;;
@@ -383,17 +394,21 @@ if [ "${#MISSING_TOOLS[@]}" -eq 0 ]; then
     exit 0
 fi
 
-if [ "$SOURCE_STOW" = true ] || [ "$SOURCE_TMUX" = true ]; then
-    SOURCE_SELECTION=stow
-    [ "$SOURCE_TMUX" = true ] && SOURCE_SELECTION=tmux
-    if [ "$SOURCE_STOW" = true ] && [ "$SOURCE_TMUX" = true ]; then
-        SOURCE_SELECTION=all
-    fi
-    printf '%s\n' "Delegating $SOURCE_SELECTION to source installer without sudo"
-    "$SOURCE_INSTALLER" --prefix "$HOME/.local" "$SOURCE_SELECTION"
+if [ "$SOURCE_STOW" = true ]; then
+    printf '%s\n' 'Delegating stow to its standalone source installer without sudo'
+    "$SOURCE_STOW_INSTALLER" --prefix "$HOME/.local"
     status=$?
     if [ "$status" -ne 0 ]; then
-        printf '%s\n' "Source build failed for $SOURCE_SELECTION (status $status)" >&2
+        printf '%s\n' "Source build failed for stow (status $status)" >&2
+        exit "$status"
+    fi
+fi
+if [ "$SOURCE_TMUX" = true ]; then
+    printf '%s\n' 'Delegating tmux to its standalone source installer without sudo'
+    "$SOURCE_TMUX_INSTALLER" --prefix "$HOME/.local"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' "Source build failed for tmux (status $status)" >&2
         exit "$status"
     fi
 fi
