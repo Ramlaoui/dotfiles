@@ -1,0 +1,14 @@
+# Public, hand-curated OMP UI preferences.
+# Runtime state, credentials, model/provider selections, rules, and agents are excluded.
+symbolPreset: nerd
+composer:
+  shape: claude
+statusLine:
+  preset: nerd
+  separator: powerline-thin
+  contextLine: embedded
+tui:
+  resizeScrollback: preserve
+display:
+  showTokenUsage: true
+  cacheMissMarker: true
