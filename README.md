@@ -127,6 +127,36 @@ Prefixes must be absolute paths without whitespace (an upstream build limitation
   helpers (tmux and fzf required for interactive pane selection). Optional
   tmux-switcher configuration uses `TMUX_SWITCHER_PATH`, not a host-specific path.
 - `zen/.config/zen/README.md`: manual, locked profile patching and backup restoration.
+## OMP preferences
+
+The public OMP preferences template is `scripts/installs/omp-preferences.yml`.
+It contains only a small, closed set of UI preferences (symbol, composer,
+status-line, scrollback, and display choices). It is hand-curated, not an export
+of a live installation, and is not linked by Stow or copied automatically.
+
+The restore utility requires Python 3 and Bun (the YAML parser used by OMP) on
+`PATH`. It defaults to a dry run and prints preference names and counts, never
+the configured values:
+
+```bash
+python3 scripts/misc/omp-preferences.py --dry-run
+python3 scripts/misc/omp-preferences.py --apply
+```
+
+Use `--config PATH` for an isolated or alternate `config.yml` target. The
+utility validates the public template before reading or writing the target,
+rejects fields, types, and values outside its allowlist, merges only approved
+keys, and preserves unrelated local YAML keys (including authentication-like
+or custom fields). `--apply` writes atomically, preserves an existing file's
+private mode, and refuses a destination symlink. Repeating an unchanged restore
+does not rewrite the file.
+Applying changes reserializes YAML; comments and formatting are not preserved.
+Stop OMP before applying so it cannot concurrently overwrite the restored settings.
+
+Credentials, provider endpoints and identifiers, model roles, approval/yolo
+policy, command or agent rules, prompts, extensions, session/history databases,
+logs, caches, and other runtime state are intentionally excluded. Keep those
+machine-local and restore or migrate them separately.
 
 ## Desktop safety
 
