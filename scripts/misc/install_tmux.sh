@@ -186,22 +186,15 @@ if [ -n "$BISON_CMD" ]; then
 fi
 
 discover_latest_tmux() {
-    metadata="$BUILD_ROOT/tmux.json"
-    source_common_download 'https://api.github.com/repos/tmux/tmux/releases/latest' "$metadata" || return 1
-    tag=$(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$metadata" | sed -n '1p')
-    prerelease=$(sed -n 's/.*"prerelease"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/\1/p' "$metadata" | sed -n '1p')
-    draft=$(sed -n 's/.*"draft"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/\1/p' "$metadata" | sed -n '1p')
-    [ -n "$tag" ] || return 1
-    [ "$prerelease" = false ] || return 1
-    [ "$draft" = false ] || return 1
-    case "$tag" in
-        *[!A-Za-z0-9._-]*) return 1 ;;
+    local page="$BUILD_ROOT/tmux-release.html"
+    # GitHub's latest page selects the stable release without an API token.
+    source_common_download 'https://github.com/tmux/tmux/releases/latest' "$page" || return 1
+    TMUX_VERSION=$(sed -n 's@.*<meta property="og:url" content="[^"]*/tmux/tmux/releases/tag/\([^"]*\)".*@\1@p' "$page")
+    case "$TMUX_VERSION" in
+        ''|*[!A-Za-z0-9._-]*) return 1 ;;
     esac
-    asset_url=$(sed -n '/"browser_download_url"[[:space:]]*:/ { s/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\(https:\/\/github\.com\/tmux\/tmux\/releases\/download\/[^" ]*\/tmux-[^" ]*\.tar\.gz\)".*/\1/p; }' "$metadata" | sed -n '1p')
-    [ -n "$asset_url" ] || return 1
-    TMUX_VERSION="$tag"
-    TMUX_URL="$asset_url"
-    TMUX_ARCHIVE=${asset_url##*/}
+    TMUX_ARCHIVE="tmux-$TMUX_VERSION.tar.gz"
+    TMUX_URL="https://github.com/tmux/tmux/releases/download/$TMUX_VERSION/$TMUX_ARCHIVE"
 }
 
 if [ -n "$VERSION" ]; then
