@@ -86,7 +86,7 @@ source_common_extract() {
     local destination="$2"
     local expected_root="$3"
     local top_root
-    top_root=$(tar -tzf "$archive" | sed -n 's#^\([^/][^/]*\)/.*#\1#p' | sed -n '1p') || {
+    top_root=$(tar -tf "$archive" | sed -n 's#^\([^/][^/]*\)/.*#\1#p' | sed -n '1p') || {
         printf '%s\n' "Cannot inspect source archive: $archive" >&2
         return 1
     }
@@ -94,7 +94,7 @@ source_common_extract() {
         printf '%s\n' "Source archive has unexpected top-level directory: ${top_root:-none} (expected $expected_root)" >&2
         return 1
     }
-    tar -xzf "$archive" -C "$destination" || {
+    tar -xf "$archive" -C "$destination" || {
         printf '%s\n' "Cannot extract source archive: $archive" >&2
         return 1
     }

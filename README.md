@@ -93,7 +93,8 @@ libevent/ncurses development packages are required. Missing m4/Bison parser tool
 are built locally when needed.
 
 tmux is linked with locally built static libevent, ncurses, and utf8proc libraries,
-so no `LD_LIBRARY_PATH` setup is needed. Each installer uses a private temporary
+plus pinned static jemalloc on macOS to satisfy tmux's allocator safeguard.
+No `LD_LIBRARY_PATH` setup is needed. Each installer uses a private temporary
 build directory and stages its files before copying into the chosen prefix.
 The final copy is not an atomic transaction. Neither installer changes shell
 configuration or restarts a running tmux. Network access is required.

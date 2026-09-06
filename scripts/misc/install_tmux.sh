@@ -61,6 +61,21 @@ BISON_ARCHIVE="bison-$BISON_VERSION.tar.gz"
 BISON_URL="https://ftp.gnu.org/gnu/bison/$BISON_ARCHIVE"
 BISON_SHA256='06c9e13bdf7eb24d4ceb6b59205a4f67c2c7e7213119644430fe82fbd14a0abb'
 
+# macOS's tmux configure requires jemalloc. Keep it pinned and static rather
+# than depending on a package manager or a system shared library.
+JEMALLOC_VERSION='5.3.1'
+JEMALLOC_ARCHIVE="jemalloc-$JEMALLOC_VERSION.tar.bz2"
+JEMALLOC_URL="https://github.com/jemalloc/jemalloc/releases/download/$JEMALLOC_VERSION/$JEMALLOC_ARCHIVE"
+JEMALLOC_SHA256='3826bc80232f22ed5c4662f3034f799ca316e819103bdc7bb99018a421706f92'
+
+TARGET_OS=''
+NEED_JEMALLOC=false
+
+TARGET_OS=$(uname -s 2>/dev/null || printf unknown)
+if [ "$TARGET_OS" = Darwin ]; then
+    NEED_JEMALLOC=true
+fi
+
 NEED_PARSER=false
 NEED_M4=false
 
@@ -78,8 +93,8 @@ Options:
   --version VERSION   Build this exact tmux release (default: latest).
   -h, --help          Show this help and exit without network access.
 
-Required commands: a C compiler, make, tar, gzip, mktemp, and curl or wget.
-Checksum verification requires sha256sum (Linux) or shasum (macOS).
+Required commands: a C compiler, make, tar, mktemp, and curl or wget.
+Pinned archive checksums require sha256sum (Linux) or shasum (macOS).
 If yacc/bison or m4 are unavailable, pinned GNU releases are built locally.
 No git, autotools, pkg-config, Python, makeinfo, or sudo is required.
 The script never edits shell startup files. Add PREFIX/bin to PATH yourself.
@@ -142,7 +157,6 @@ esac
 
 command -v make >/dev/null 2>&1 || fail 'required command not found: make'
 command -v tar >/dev/null 2>&1 || fail 'required command not found: tar'
-command -v gzip >/dev/null 2>&1 || fail 'required command not found: gzip'
 command -v mktemp >/dev/null 2>&1 || fail 'required command not found: mktemp'
 command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || fail 'curl or wget is required to download release archives'
 if command -v cc >/dev/null 2>&1; then
@@ -282,6 +296,20 @@ build_utf8proc() {
     cp "$source_dir/utf8proc.h" "$LOCAL_PREFIX/include/" || return 1
 }
 
+build_jemalloc() {
+    archive="$DOWNLOADS/$JEMALLOC_ARCHIVE"
+    source_common_download "$JEMALLOC_URL" "$archive" || return 1
+    source_common_verify_sha256 "$archive" "$JEMALLOC_SHA256" || return 1
+    source_common_extract "$archive" "$SOURCES" "jemalloc-$JEMALLOC_VERSION" || return 1
+    source_dir="$SOURCES/jemalloc-$JEMALLOC_VERSION"
+    (
+        cd "$source_dir" &&
+        CC="$CC_CMD" ./configure --prefix="$LOCAL_PREFIX" --disable-cxx --disable-doc --disable-shared --enable-static &&
+        "$MAKE_CMD" -j"$JOBS" &&
+        "$MAKE_CMD" install
+    ) || return $?
+}
+
 build_tmux() {
     archive="$DOWNLOADS/$TMUX_ARCHIVE"
     source_common_download "$TMUX_URL" "$archive" || return 1
@@ -293,10 +321,20 @@ build_tmux() {
     local_ncurses="$LOCAL_PREFIX/lib/libncursesw.a"
     local_tinfo="$LOCAL_PREFIX/lib/libtinfow.a"
     local_utf8proc="$LOCAL_PREFIX/lib/libutf8proc.a"
+    jemalloc_cflags=''
+    jemalloc_libs=''
+    jemalloc_option=''
     [ -f "$local_event" ] || return 1
     [ -f "$local_ncurses" ] || return 1
     [ -f "$local_tinfo" ] || return 1
     [ -f "$local_utf8proc" ] || return 1
+    if [ "$NEED_JEMALLOC" = true ]; then
+        local_jemalloc="$LOCAL_PREFIX/lib/libjemalloc.a"
+        [ -f "$local_jemalloc" ] || return 1
+        jemalloc_cflags="$include_flags"
+        jemalloc_libs="$local_jemalloc"
+        jemalloc_option='--enable-jemalloc'
+    fi
     # Absolute archive paths prevent configure from silently selecting system
     # shared libraries. There is intentionally no -Bstatic (not portable to
     # the macOS linker). --enable-utf8proc is required on macOS as well.
@@ -311,8 +349,9 @@ build_tmux() {
         LIBNCURSESW_CFLAGS="$include_flags" LIBNCURSESW_LIBS="$local_ncurses $local_tinfo" \
         LIBNCURSES_CFLAGS="$include_flags" LIBNCURSES_LIBS="$local_ncurses $local_tinfo" \
         LIBUTF8PROC_CFLAGS="$include_flags" LIBUTF8PROC_LIBS="$local_utf8proc" \
+        JEMALLOC_CFLAGS="$jemalloc_cflags" JEMALLOC_LIBS="$jemalloc_libs" \
         LIBS="$local_event $local_ncurses $local_tinfo" \
-        CC="$CC_CMD" ./configure --prefix="$PREFIX" --enable-utf8proc &&
+        CC="$CC_CMD" ./configure --prefix="$PREFIX" --enable-utf8proc $jemalloc_option &&
         PATH="$TOOLS_BIN:$PATH" "$MAKE_CMD" -j"$JOBS" DESTDIR="$STAGE_ROOT" &&
         PATH="$TOOLS_BIN:$PATH" "$MAKE_CMD" DESTDIR="$STAGE_ROOT" install
     ) || return $?
@@ -332,6 +371,10 @@ printf '%s\n' "Building pinned ncurses $NCURSES_VERSION (static wide-character l
 build_ncurses || fail "ncurses $NCURSES_VERSION build failed"
 printf '%s\n' "Building pinned utf8proc $UTF8PROC_VERSION (static Unicode support)"
 build_utf8proc || fail "utf8proc $UTF8PROC_VERSION build failed"
+if [ "$NEED_JEMALLOC" = true ]; then
+    printf '%s\n' "Building pinned jemalloc $JEMALLOC_VERSION (static)"
+    build_jemalloc || fail "jemalloc $JEMALLOC_VERSION build failed"
+fi
 printf '%s\n' "Building tmux $TMUX_VERSION"
 build_tmux || fail "tmux $TMUX_VERSION build failed"
 

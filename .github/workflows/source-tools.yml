@@ -40,7 +40,7 @@ jobs:
             linkage=$(otool -L "$prefix/bin/tmux")
           fi
           printf '%s\n' "$linkage"
-          if printf '%s\n' "$linkage" | grep -E 'lib(event|ncurses|tinfo|utf8proc)'; then
+          if printf '%s\n' "$linkage" | grep -E 'lib(event|ncurses|tinfo|utf8proc|jemalloc)'; then
             echo "tmux must not depend on system copies of its bundled libraries" >&2
             exit 1
           fi
