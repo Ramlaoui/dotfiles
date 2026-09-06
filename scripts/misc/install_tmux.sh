@@ -302,9 +302,10 @@ build_jemalloc() {
     source_common_verify_sha256 "$archive" "$JEMALLOC_SHA256" || return 1
     source_common_extract "$archive" "$SOURCES" "jemalloc-$JEMALLOC_VERSION" || return 1
     source_dir="$SOURCES/jemalloc-$JEMALLOC_VERSION"
+    # tmux calls unprefixed mallctl; jemalloc defaults to je_ on macOS.
     (
         cd "$source_dir" &&
-        CC="$CC_CMD" ./configure --prefix="$LOCAL_PREFIX" --disable-cxx --disable-doc --disable-shared --enable-static &&
+        CC="$CC_CMD" ./configure --prefix="$LOCAL_PREFIX" --with-jemalloc-prefix= --disable-cxx --disable-doc --disable-shared --enable-static &&
         "$MAKE_CMD" -j"$JOBS" &&
         "$MAKE_CMD" install
     ) || return $?
