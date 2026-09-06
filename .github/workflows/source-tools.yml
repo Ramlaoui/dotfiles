@@ -1,0 +1,54 @@
+name: Source installation
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/misc/install_stow.sh'
+      - 'scripts/misc/install_tmux.sh'
+      - 'scripts/installs/source-common.sh'
+      - 'scripts/installs/core-dependency.sh'
+      - '.github/workflows/source-tools.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build latest stable Stow
+        run: bash scripts/misc/install_stow.sh --prefix "$RUNNER_TEMP/source-tools" --jobs 2
+      - name: Build latest stable tmux and pinned local dependencies
+        run: bash scripts/misc/install_tmux.sh --prefix "$RUNNER_TEMP/source-tools" --jobs 2
+      - name: Exercise installed Stow and isolated tmux server
+        run: |
+          prefix="$RUNNER_TEMP/source-tools"
+          "$prefix/bin/stow" --version
+          "$prefix/bin/tmux" -V
+          if [ "$RUNNER_OS" = Linux ]; then
+            linkage=$(ldd "$prefix/bin/tmux")
+          else
+            linkage=$(otool -L "$prefix/bin/tmux")
+          fi
+          printf '%s\n' "$linkage"
+          if printf '%s\n' "$linkage" | grep -E 'lib(event|ncurses|tinfo|utf8proc|jemalloc)'; then
+            echo "tmux must not depend on system copies of its bundled libraries" >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/stow-packages/example" "$RUNNER_TEMP/stow-target"
+          printf 'source-install-smoke\n' > "$RUNNER_TEMP/stow-packages/example/probe"
+          "$prefix/bin/stow" --dir="$RUNNER_TEMP/stow-packages" --target="$RUNNER_TEMP/stow-target" example
+          test -L "$RUNNER_TEMP/stow-target/probe"
+          socket="$RUNNER_TEMP/tmux-source-smoke.sock"
+          trap '"$prefix/bin/tmux" -S "$socket" kill-server 2>/dev/null || true' EXIT
+          "$prefix/bin/tmux" -S "$socket" -f /dev/null new-session -d -s source-smoke 'sleep 60'
+          "$prefix/bin/tmux" -S "$socket" has-session -t source-smoke

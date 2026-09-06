@@ -52,10 +52,61 @@ boundaries and failure statuses. Git LFS is included because the Git configurati
 uses its filters. `uv` and `blesh` are optional.
 
 `--no-sudo` never invokes sudo. Missing tools without a supported local recipe fail
-explicitly rather than attempting a privileged installation. Local source recipes
-use pinned revisions and propagate build failures. It is not a promise that every
-core dependency can be installed without administrator access. Bootstrap scripts
-are not fetched and piped into a shell.
+explicitly rather than attempting a privileged installation. Stow and tmux delegate
+to the standalone source installers below; other local recipes use pinned
+revisions. Build failures propagate. Not every core dependency has a local recipe.
+Bootstrap scripts are not fetched and piped into a shell.
+
+### Latest Stow and tmux from source (no sudo)
+
+```bash
+# Independent installs into ~/.local, even if older system versions exist.
+bash scripts/misc/install_stow.sh --jobs 4
+bash scripts/misc/install_tmux.sh --jobs 4
+export PATH="$HOME/.local/bin:$PATH"
+stow --version
+tmux -V
+
+# Choose a prefix or request an explicit application version:
+bash scripts/misc/install_stow.sh --prefix "$HOME/local" --version 2.4.1
+bash scripts/misc/install_tmux.sh --prefix "$HOME/local" --jobs 4 --version 3.7c
+```
+
+Each installer defaults to the latest stable application release: GNU's release
+listing for Stow, GitHub's latest stable release for tmux. `--version` selects an
+explicit release instead. Both use release archives, not Git checkouts.
+
+tmux's supporting libraries and parser tools use tested versions with checked-in
+SHA256 checksums; they do not independently chase latest releases. A checksum
+mismatch stops the build before extraction.
+These hashes pin the official dependency archives retrieved during development.
+Application archives are downloaded over official HTTPS URLs without signature
+verification; `--version` selects a release, not a cryptographic content pin.
+
+Stow needs **make, Perl, tar/gzip, curl or wget**, and ordinary Unix shell
+utilities. tmux additionally needs a **C compiler and its standard toolchain**
+and **sha256sum or shasum** (standard on Linux/macOS respectively).
+Linux needs a working compiler/libc development environment; macOS needs the
+Command Line Tools. Those basic prerequisites cannot be bootstrapped from nothing.
+No sudo, Git, autotools, pkg-config, Python, makeinfo, or preinstalled
+libevent/ncurses development packages are required. Missing m4/Bison parser tools
+are built locally when needed.
+
+tmux is linked with locally built static libevent, ncurses, and utf8proc libraries,
+plus pinned static jemalloc on macOS to satisfy tmux's allocator safeguard.
+No `LD_LIBRARY_PATH` setup is needed. Each installer uses a private temporary
+build directory and stages its files before copying into the chosen prefix.
+The final copy is not an atomic transaction. Neither installer changes shell
+configuration or restarts a running tmux. Network access is required.
+
+The two entrypoints own their recipes. `scripts/installs/source-common.sh` only
+shares common installation mechanics; there is no combined installer or recipe
+registry.
+
+The general `./install.sh deps --no-sudo stow tmux` path calls these same scripts
+for missing tools. Use the standalone commands above to upgrade an already
+installed version. Change PATH deliberately to select the new binaries.
+Prefixes must be absolute paths without whitespace (an upstream build limitation).
 
 ## Configuration ownership
 

@@ -14,6 +14,14 @@ set -o pipefail
 
 PURPLE='\033[0;35m'
 YELLOW='\033[0;33m'
+PROGRAM=${0##*/}
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+SCRIPT_DIR=${SCRIPT_PATH%/*}
+[ "$SCRIPT_DIR" = "$SCRIPT_PATH" ] && SCRIPT_DIR=.
+SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" 2>/dev/null && pwd -P)" || exit 1
+SOURCE_STOW_INSTALLER="$SCRIPT_DIR/../misc/install_stow.sh"
+SOURCE_TMUX_INSTALLER="$SCRIPT_DIR/../misc/install_tmux.sh"
+
 RESET='\033[0m'
 
 core_packages=(
@@ -31,7 +39,7 @@ SPECIFIC_PACKAGES=()
 
 print_usage() {
     cat <<EOF
-Usage: $(basename "$0") [options] [tool ...]
+Usage: $PROGRAM [options] [tool ...]
 
 Install dependencies using the native package manager.  Tool names are
 canonical command names; platform package names are selected automatically.
@@ -204,28 +212,27 @@ is_tool_installed() {
     fi
     command -v "$(command_for_tool "$tool")" >/dev/null 2>&1
 }
-# User-local source recipes are deliberately few and pinned to immutable
-# upstream commits.  They are used only with --no-sudo; package-manager
-# installs remain preferred everywhere else.  The prereq check is part of
-# preflight so an unsupported request cannot partially build earlier tools.
+# User-local source recipes are deliberately few. Stow and tmux are handled by
+# their matching standalone entrypoints. The other recipes remain pinned
+# because they are unrelated to this source bootstrap.
+local_source_installer() {
+    case "$1" in
+        stow) printf '%s\n' "$SOURCE_STOW_INSTALLER" ;;
+        tmux) printf '%s\n' "$SOURCE_TMUX_INSTALLER" ;;
+        *) return 1 ;;
+    esac
+}
+
 local_recipe_supported() {
     local tool="$1"
+    local installer
     case "$tool" in
-        stow)
-            for prerequisite in git perl make autoconf automake; do
-                command -v "$prerequisite" >/dev/null 2>&1 || {
-                    printf '%s\n' "Missing local-build prerequisite for stow: $prerequisite" >&2
-                    return 1
-                }
-            done
-            ;;
-        tmux)
-            for prerequisite in git make cc autoconf automake bison pkg-config; do
-                command -v "$prerequisite" >/dev/null 2>&1 || {
-                    printf '%s\n' "Missing local-build prerequisite for tmux: $prerequisite" >&2
-                    return 1
-                }
-            done
+        stow|tmux)
+            installer="$(local_source_installer "$tool")"
+            if [ ! -x "$installer" ]; then
+                printf '%s\n' "No supported source installer for $tool: $installer" >&2
+                return 1
+            fi
             ;;
         fzf)
             for prerequisite in git make go; do
@@ -303,24 +310,6 @@ install_local_tool() {
         [ "$status" -eq 0 ] || return "$status"
     fi
     case "$tool" in
-        stow)
-            source_dir="$BUILD_ROOT/stow"
-            clone_pinned_source "https://github.com/aspiers/stow.git" "1e2513417de217599617a2cf6737c0517a13926a" "$source_dir"
-            status=$?
-            [ "$status" -eq 0 ] || return "$status"
-            (cd "$source_dir" && if [ ! -x ./configure ]; then autoreconf -fi; fi && ./configure --prefix="$HOME/.local" && make && make install)
-            status=$?
-            [ "$status" -eq 0 ] || return "$status"
-            ;;
-        tmux)
-            source_dir="$BUILD_ROOT/tmux"
-            clone_pinned_source "https://github.com/tmux/tmux.git" "e476c1230b958df0cb12977517d24b3dc931375b" "$source_dir"
-            status=$?
-            [ "$status" -eq 0 ] || return "$status"
-            (cd "$source_dir" && sh autogen.sh && ./configure --prefix="$HOME/.local" && make && make install)
-            status=$?
-            [ "$status" -eq 0 ] || return "$status"
-            ;;
         fzf)
             source_dir="$BUILD_ROOT/fzf"
             clone_pinned_source "https://github.com/junegunn/fzf.git" "6765f464a60e39afc20775f54f7ba40896bf1b81" "$source_dir"
@@ -359,6 +348,8 @@ export PATH="$HOME/.local/bin:$PATH"
 MISSING_TOOLS=()
 LOCAL_TOOLS=()
 MANAGER_PACKAGES=()
+SOURCE_STOW=false
+SOURCE_TMUX=false
 PREFLIGHT_FAILURE=false
 for tool in "${SPECIFIC_PACKAGES[@]}"; do
     if is_tool_installed "$tool"; then
@@ -366,9 +357,17 @@ for tool in "${SPECIFIC_PACKAGES[@]}"; do
         continue
     fi
     MISSING_TOOLS+=("$tool")
-    if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
+    LOCAL_MODE=false
+    if [ "$USE_SUDO" = false ]; then
+        if [ "$PLATFORM" != macos ] || [ "$tool" = stow ] || [ "$tool" = tmux ]; then
+            LOCAL_MODE=true
+        fi
+    fi
+    if [ "$LOCAL_MODE" = true ]; then
         if local_recipe_supported "$tool"; then
             LOCAL_TOOLS+=("$tool")
+            [ "$tool" = stow ] && SOURCE_STOW=true
+            [ "$tool" = tmux ] && SOURCE_TMUX=true
         else
             PREFLIGHT_FAILURE=true
         fi
@@ -395,9 +394,31 @@ if [ "${#MISSING_TOOLS[@]}" -eq 0 ]; then
     exit 0
 fi
 
+if [ "$SOURCE_STOW" = true ]; then
+    printf '%s\n' 'Delegating stow to its standalone source installer without sudo'
+    "$SOURCE_STOW_INSTALLER" --prefix "$HOME/.local"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' "Source build failed for stow (status $status)" >&2
+        exit "$status"
+    fi
+fi
+if [ "$SOURCE_TMUX" = true ]; then
+    printf '%s\n' 'Delegating tmux to its standalone source installer without sudo'
+    "$SOURCE_TMUX_INSTALLER" --prefix "$HOME/.local"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' "Source build failed for tmux (status $status)" >&2
+        exit "$status"
+    fi
+fi
+
 if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
-    printf '%s\n' "Building selected tool(s) locally without sudo: ${LOCAL_TOOLS[*]}"
+    printf '%s\n' "Building remaining local tool(s) without sudo: ${LOCAL_TOOLS[*]}"
     for tool in "${LOCAL_TOOLS[@]}"; do
+        case "$tool" in
+            stow|tmux) continue ;;
+        esac
         printf '%s\n' "Building $tool from its pinned source revision"
         install_local_tool "$tool"
         status=$?
@@ -406,6 +427,21 @@ if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
             exit "$status"
         fi
     done
+    POST_FAILURE=false
+    for tool in "${MISSING_TOOLS[@]}"; do
+        if ! is_tool_installed "$tool"; then
+            printf '%s\n' "Local build completed but $tool is unavailable" >&2
+            POST_FAILURE=true
+        fi
+    done
+    [ "$POST_FAILURE" = false ] || exit 1
+    printf '%s\n' 'Local dependency installation complete.'
+    exit 0
+fi
+
+if [ "$USE_SUDO" = false ] && [ "$PLATFORM" = macos ] && \
+   [ "${#MANAGER_PACKAGES[@]}" -eq 0 ] && \
+   { [ "$SOURCE_STOW" = true ] || [ "$SOURCE_TMUX" = true ]; }; then
     POST_FAILURE=false
     for tool in "${MISSING_TOOLS[@]}"; do
         if ! is_tool_installed "$tool"; then
