@@ -333,7 +333,9 @@ build_tmux() {
         local_jemalloc="$LOCAL_PREFIX/lib/libjemalloc.a"
         [ -f "$local_jemalloc" ] || return 1
         jemalloc_cflags="$include_flags"
-        jemalloc_libs="$local_jemalloc"
+        # Retain zone.o's constructor so libc allocations use jemalloc too.
+        # Without it, tmux frees system-allocated pointers through jemalloc.
+        jemalloc_libs="-Wl,-force_load,$local_jemalloc"
         jemalloc_option='--enable-jemalloc'
     fi
     # Absolute archive paths prevent configure from silently selecting system
