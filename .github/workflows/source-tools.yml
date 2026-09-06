@@ -52,6 +52,3 @@ jobs:
           trap '"$prefix/bin/tmux" -S "$socket" kill-server 2>/dev/null || true' EXIT
           "$prefix/bin/tmux" -S "$socket" -f /dev/null new-session -d -s source-smoke 'sleep 60'
           "$prefix/bin/tmux" -S "$socket" has-session -t source-smoke
-      - name: DEBUG-allocator native startup backtrace
-        if: failure() && runner.os == 'macOS'
-        run: lldb --batch -o run -k 'thread backtrace all -c 30' -- "$RUNNER_TEMP/source-tools/bin/tmux" -V
