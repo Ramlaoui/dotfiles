@@ -155,11 +155,14 @@ class DependencyAdapterTest(unittest.TestCase):
         )
         # Keep the installer shell and the local-build failure path usable
         # without allowing ambient dependency commands to satisfy requests.
-        for command in ("bash", "chmod", "make", "mkdir", "mktemp", "rm", "touch"):
+        for command in ("bash", "chmod", "cp", "make", "mkdir", "mktemp", "rm", "touch"):
             source = shutil.which(command)
             if source is None:
                 self.fail(f"required test utility is unavailable: {command}")
             (self.fake_bin / command).symlink_to(source)
+        self.build_tmp = self.root / "tmp"
+        self.build_tmp.mkdir()
+        self.env["TMPDIR"] = str(self.build_tmp)
         Path(self.env["HOME"]).mkdir()
 
     def tearDown(self):
@@ -167,6 +170,8 @@ class DependencyAdapterTest(unittest.TestCase):
 
     def write_executable(self, name, content):
         path = self.fake_bin / name
+        if path.is_symlink():
+            path.unlink()
         path.write_text(content)
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
         return path
@@ -181,6 +186,170 @@ class DependencyAdapterTest(unittest.TestCase):
             stderr=subprocess.STDOUT,
             check=False,
         )
+
+    def fake_macos_source_commands(self):
+        self.env.update(
+            {
+                "DOTFILES_OS": "Darwin",
+                "CALL_LOG": str(self.log),
+                "FAKE_BIN": str(self.fake_bin),
+            }
+        )
+        self.write_executable(
+            "sudo", '#!/bin/sh\necho sudo >> "$CALL_LOG"\nexit 99\n'
+        )
+        self.write_executable(
+            "brew", '#!/bin/sh\necho brew >> "$CALL_LOG"\nexit 98\n'
+        )
+        self.write_executable("gawk", "#!/bin/sh\nexit 0\n")
+        self.write_executable(
+            "git",
+            """#!/bin/sh
+echo git >> "$CALL_LOG"
+if [ "$1" = -C ]; then
+    cd "$2" || exit 1
+    shift 2
+fi
+case "$1" in
+    init|remote|fetch) ;;
+    checkout)
+        for revision in "$@"; do :; done
+        printf '%s\\n' "$revision" > .fake-revision
+        ;;
+    rev-parse)
+        read -r revision < .fake-revision || exit 1
+        printf '%s\\n' "$revision"
+        ;;
+    submodule)
+        mkdir -p contrib
+        touch contrib/.fake-checkout
+        ;;
+    *) exit 90 ;;
+esac
+""",
+        )
+        self.write_executable(
+            "make",
+            """#!/bin/sh
+if [ "$1" = --version ]; then
+    printf '%s\\n' 'GNU Make 4.4'
+    exit 0
+fi
+echo make >> "$CALL_LOG"
+[ "${FAKE_BUILD_STATUS:-0}" -eq 0 ] || exit "$FAKE_BUILD_STATUS"
+[ -f contrib/.fake-checkout ] || exit 91
+prefix="$HOME/.local"
+insdir=
+install=false
+for arg in "$@"; do
+    case "$arg" in
+        install) install=true ;;
+        PREFIX=*) prefix=${arg#PREFIX=} ;;
+        INSDIR=*) insdir=${arg#INSDIR=} ;;
+    esac
+done
+[ "$install" = true ] || exit 92
+target=${insdir:-$prefix/share/blesh}
+mkdir -p "$target" || exit 1
+printf '%s\\n' '# fake ble.sh' > "$target/ble.sh"
+""",
+        )
+
+    def fake_brew_install(self):
+        self.write_executable(
+            "brew",
+            """#!/bin/sh
+echo brew >> "$CALL_LOG"
+[ "$1" = install ] || exit 93
+shift
+[ "$#" -gt 0 ] || exit 94
+for package in "$@"; do
+    case "$package" in
+        git-lfs)
+            if [ "${FAKE_BREW_SKIP_INSTALL:-0}" != 1 ]; then
+                printf '#!/bin/sh\\nexit 0\\n' > "$FAKE_BIN/git-lfs"
+                chmod +x "$FAKE_BIN/git-lfs"
+            fi
+            ;;
+        *) exit 95 ;;
+    esac
+done
+""",
+        )
+
+    def assert_source_only_install(self, *options):
+        result = self.run_deps("--auto-yes", *options, "blesh")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        data_home = Path(
+            self.env.get("XDG_DATA_HOME", Path(self.env["HOME"]) / ".local/share")
+        )
+        self.assertTrue((data_home / "blesh/ble.sh").is_file(), result.stdout)
+        calls = self.log.read_text().splitlines()
+        self.assertNotIn("sudo", calls)
+        self.assertNotIn("brew", calls)
+
+    def test_macos_blesh_default_installs_without_brew_or_sudo(self):
+        self.fake_macos_source_commands()
+        self.env.pop("XDG_DATA_HOME")
+        self.assert_source_only_install()
+
+    def test_macos_blesh_no_sudo_honors_custom_data_home(self):
+        self.fake_macos_source_commands()
+        self.env["XDG_DATA_HOME"] = str(self.root / "custom data")
+        self.assert_source_only_install("--no-sudo")
+        self.assertFalse((Path(self.env["HOME"]) / ".local/share/blesh").exists())
+
+    def test_macos_mixed_request_installs_brew_and_source_tools(self):
+        self.fake_macos_source_commands()
+        self.fake_brew_install()
+        result = self.run_deps("--auto-yes", "--no-sudo", "blesh", "git-lfs")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertTrue((Path(self.env["XDG_DATA_HOME"]) / "blesh/ble.sh").is_file())
+        self.assertTrue(os.access(self.fake_bin / "git-lfs", os.X_OK))
+        self.assertNotIn("sudo", self.log.read_text().splitlines())
+
+    def test_macos_missing_brew_prevents_source_mutation(self):
+        self.fake_macos_source_commands()
+        (self.fake_bin / "brew").unlink()
+        result = self.run_deps("--auto-yes", "blesh", "git-lfs")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("brew", result.stdout.lower())
+        self.assertFalse(self.log.exists(), result.stdout)
+        self.assertFalse((Path(self.env["HOME"]) / ".local").exists())
+        self.assertFalse(Path(self.env["XDG_DATA_HOME"]).exists())
+        self.assertEqual(list(self.build_tmp.iterdir()), [])
+
+    def test_macos_missing_gawk_fails_before_fetch_or_build(self):
+        self.fake_macos_source_commands()
+        (self.fake_bin / "gawk").unlink()
+        result = self.run_deps("--auto-yes", "blesh")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("gawk", result.stdout.lower())
+        self.assertFalse(self.log.exists(), result.stdout)
+        self.assertFalse((Path(self.env["HOME"]) / ".local").exists())
+        self.assertFalse(Path(self.env["XDG_DATA_HOME"]).exists())
+        self.assertEqual(list(self.build_tmp.iterdir()), [])
+
+    def test_macos_blesh_build_failure_propagates_status(self):
+        self.fake_macos_source_commands()
+        self.env["FAKE_BUILD_STATUS"] = "31"
+        result = self.run_deps("--auto-yes", "blesh")
+        self.assertEqual(result.returncode, 31, result.stdout)
+        self.assertFalse((Path(self.env["XDG_DATA_HOME"]) / "blesh/ble.sh").exists())
+        calls = self.log.read_text().splitlines()
+        self.assertIn("make", calls)
+        self.assertNotIn("sudo", calls)
+        self.assertNotIn("brew", calls)
+
+    def test_macos_mixed_request_verifies_manager_installed_tool(self):
+        self.fake_macos_source_commands()
+        self.fake_brew_install()
+        self.env["FAKE_BREW_SKIP_INSTALL"] = "1"
+        result = self.run_deps("--auto-yes", "blesh", "git-lfs")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertTrue((Path(self.env["XDG_DATA_HOME"]) / "blesh/ble.sh").is_file())
+        self.assertFalse((self.fake_bin / "git-lfs").exists())
+        self.assertIn("git-lfs", result.stdout)
 
     def test_manager_receives_separate_canonical_arguments(self):
         self.write_executable(
@@ -207,24 +376,23 @@ class DependencyAdapterTest(unittest.TestCase):
         result = self.run_deps("--no-sudo", "--auto-yes", "git-lfs")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertFalse(self.log.exists())
-        self.assertIn("no supported deterministic local recipe", result.stdout.lower())
+        self.assertIn("git-lfs", result.stdout)
 
     def test_package_manager_failure_propagates_status(self):
         self.write_executable("sudo", '#!/bin/sh\nexec "$@"\n')
         self.write_executable("pacman", "#!/bin/sh\nexit 23\n")
         result = self.run_deps("--auto-yes", "git-lfs")
         self.assertEqual(result.returncode, 23, result.stdout)
-        self.assertIn("status 23", result.stdout)
 
-    def test_local_build_failure_propagates_status(self):
+    def test_local_fetch_failure_propagates_status(self):
         self.write_executable(
             "sudo", '#!/bin/sh\necho invoked >> "$CALL_LOG"\nexit 99\n'
         )
         self.write_executable("git", "#!/bin/sh\nexit 17\n")
+        self.write_executable("gawk", "#!/bin/sh\nexit 0\n")
         self.env["CALL_LOG"] = str(self.log)
         result = self.run_deps("--no-sudo", "--auto-yes", "blesh")
         self.assertEqual(result.returncode, 17, result.stdout)
-        self.assertNotIn("Package manager", result.stdout)
         self.assertFalse(self.log.exists())
 
 
