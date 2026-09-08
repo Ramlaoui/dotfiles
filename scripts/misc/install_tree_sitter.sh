@@ -111,7 +111,11 @@ fi
 if [ -e "$ROOT" ]; then
     [ -L "$BIN_LINK" ] && [ "$(readlink "$BIN_LINK")" = "$RELATIVE_TARGET" ] || fail "refusing existing root without its managed link: $ROOT"
     [ ! -L "$ROOT/bin" ] && [ ! -L "$ROOT/bin/tree-sitter" ] || fail "refusing symlinked content in $ROOT"
-    "$ROOT/bin/tree-sitter" --version || fail "existing Tree-sitter cannot run: $ROOT"
+    reported_version=$("$ROOT/bin/tree-sitter" --version) || fail "existing Tree-sitter cannot run: $ROOT"
+    case "$reported_version" in
+        "tree-sitter $VERSION"|"tree-sitter $VERSION "*) ;;
+        *) fail "existing root does not contain Tree-sitter $VERSION: $ROOT" ;;
+    esac
     printf '%s\n' "Tree-sitter $VERSION is already installed at $ROOT"
     exit 0
 fi
@@ -244,9 +248,12 @@ STAGE=$(mktemp -d "$PREFIX/lib/.tree-sitter.XXXXXX") || fail 'cannot create inst
 mkdir "$STAGE/bin" || exit 1
 cp "$CANDIDATE" "$STAGE/bin/tree-sitter" || exit 1
 "$STAGE/bin/tree-sitter" --version || fail 'staged executable cannot run from this prefix'
+# Recheck after the build, then record ownership before the rename: a signal
+# may run the EXIT trap before the shell executes the next assignment.
+[ ! -e "$ROOT" ] && [ ! -L "$ROOT" ] || fail "installation root appeared during the build: $ROOT"
+CREATED_ROOT="$ROOT"
 mv "$STAGE" "$ROOT" || exit 1
 STAGE=''
-CREATED_ROOT="$ROOT"
 LINK_DIR=$(mktemp -d "$PREFIX/bin/.tree-sitter.XXXXXX") || fail 'cannot stage managed link'
 ln -s "$RELATIVE_TARGET" "$LINK_DIR/tree-sitter" || exit 1
 mv -f "$LINK_DIR/tree-sitter" "$BIN_LINK" || exit 1

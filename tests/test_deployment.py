@@ -694,12 +694,18 @@ class TreeSitterInstallerTest(unittest.TestCase):
 
             (release / "bin").mkdir()
             binary = release / "bin" / "tree-sitter"
-            binary.write_text("#!/bin/sh\necho 'tree-sitter 0.27.0'\n")
+            binary.write_text("#!/bin/sh\necho 'tree-sitter 0.26.0'\n")
             binary.chmod(0o755)
             (prefix / "bin").mkdir()
             link = prefix / "bin" / "tree-sitter"
             target = "../lib/tree-sitter-v0.27.0/bin/tree-sitter"
             link.symlink_to(target)
+            mismatched = subprocess.run(
+                argv, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            self.assertNotEqual(mismatched.returncode, 0, mismatched.stdout)
+            self.assertEqual(sentinel.read_text(), "existing content\n")
+            binary.write_text("#!/bin/sh\necho 'tree-sitter 0.27.0'\n")
             repeated = subprocess.run(
                 argv, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             )
