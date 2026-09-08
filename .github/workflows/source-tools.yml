@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/misc/install_stow.sh'
       - 'scripts/misc/install_tmux.sh'
+      - 'scripts/misc/install_go.sh'
       - 'scripts/installs/source-common.sh'
       - 'scripts/installs/core-dependency.sh'
       - '.github/workflows/source-tools.yml'
@@ -25,6 +26,17 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
+      - name: Install and exercise official Go distribution
+        run: |
+          prefix="$RUNNER_TEMP/source-tools"
+          bash scripts/misc/install_go.sh --prefix "$prefix"
+          unset GOROOT
+          export GOTOOLCHAIN=local
+          "$prefix/bin/go" version
+          printf 'package main\nimport "fmt"\nfunc main() { fmt.Println("go-smoke-ok") }\n' > "$RUNNER_TEMP/probe.go"
+          "$prefix/bin/gofmt" -w "$RUNNER_TEMP/probe.go"
+          "$prefix/bin/go" build -o "$RUNNER_TEMP/probe" "$RUNNER_TEMP/probe.go"
+          test "$("$RUNNER_TEMP/probe")" = go-smoke-ok
       - name: Build latest stable Stow
         run: bash scripts/misc/install_stow.sh --prefix "$RUNNER_TEMP/source-tools" --jobs 2
       - name: Build latest stable tmux and pinned local dependencies

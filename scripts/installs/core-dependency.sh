@@ -21,11 +21,11 @@ SCRIPT_DIR=${SCRIPT_PATH%/*}
 SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" 2>/dev/null && pwd -P)" || exit 1
 SOURCE_STOW_INSTALLER="$SCRIPT_DIR/../misc/install_stow.sh"
 SOURCE_TMUX_INSTALLER="$SCRIPT_DIR/../misc/install_tmux.sh"
-
+SOURCE_GO_INSTALLER="$SCRIPT_DIR/../misc/install_go.sh"
 RESET='\033[0m'
 
 core_packages=(
-    git curl cmake venv neovim fd delta lazygit bat eza tldr zsh htop fzf
+    git curl cmake venv neovim fd delta lazygit bat eza tldr zsh htop fzf go
     tmux stow ripgrep git-lfs jq starship node npm
 )
 optional_packages=(
@@ -116,27 +116,35 @@ DISTRO="${DOTFILES_DISTRO:-}"
 if [ "$OS_NAME" = Darwin ] || [ "$OS_NAME" = macOS ]; then
     PLATFORM=macos
 elif [ "$OS_NAME" = Linux ]; then
-    if [ -z "$DISTRO" ]; then
-        if [ -f /etc/arch-release ]; then
-            DISTRO=arch
-        elif [ -r /etc/os-release ]; then
-            . /etc/os-release
-            case "${ID:-}:${ID_LIKE:-}" in
-                debian:*|ubuntu:*|*:debian*|*:ubuntu*) DISTRO=debian ;;
-                *) printf '%s\n' "Unsupported Linux distribution: ${ID:-unknown}" >&2; exit 1 ;;
-            esac
-        else
-            printf '%s\n' 'Cannot identify Linux distribution; set DOTFILES_DISTRO=arch or debian explicitly' >&2
-            exit 1
+    # A no-sudo request must remain usable on distributions without a native
+    # adapter (for example SLES on LUMI): local recipes do not need a distro
+    # identity.  Sudo-backed requests still require an explicit supported
+    # native adapter below.
+    if [ "$USE_SUDO" = false ]; then
+        PLATFORM=linux
+    else
+        if [ -z "$DISTRO" ]; then
+            if [ -f /etc/arch-release ]; then
+                DISTRO=arch
+            elif [ -r /etc/os-release ]; then
+                . /etc/os-release
+                case "${ID:-}:${ID_LIKE:-}" in
+                    debian:*|ubuntu:*|*:debian*|*:ubuntu*) DISTRO=debian ;;
+                    *) printf '%s\n' "Unsupported Linux distribution: ${ID:-unknown}" >&2; exit 1 ;;
+                esac
+            else
+                printf '%s\n' 'Cannot identify Linux distribution; set DOTFILES_DISTRO=arch or debian explicitly' >&2
+                exit 1
+            fi
         fi
+        case "$DISTRO" in
+            arch|debian) PLATFORM="$DISTRO" ;;
+            *)
+                printf '%s\n' "Unsupported Linux distribution: $DISTRO" >&2
+                exit 1
+                ;;
+        esac
     fi
-    case "$DISTRO" in
-        arch|debian) PLATFORM="$DISTRO" ;;
-        *)
-            printf '%s\n' "Unsupported Linux distribution: $DISTRO" >&2
-            exit 1
-            ;;
-    esac
 else
     printf '%s\n' "Unsupported operating system: $OS_NAME" >&2
     exit 1
@@ -164,6 +172,7 @@ platform_package_name() {
         arch:zsh|debian:zsh|macos:zsh) printf '%s\n' zsh ;;
         arch:htop|debian:htop|macos:htop) printf '%s\n' htop ;;
         arch:fzf|debian:fzf|macos:fzf) printf '%s\n' fzf ;;
+        arch:go|debian:go|macos:go) printf '%s\n' go ;;
         arch:tmux|debian:tmux|macos:tmux) printf '%s\n' tmux ;;
         arch:stow|debian:stow|macos:stow) printf '%s\n' stow ;;
         arch:ripgrep|debian:ripgrep|macos:ripgrep) printf '%s\n' ripgrep ;;
@@ -212,13 +221,14 @@ is_tool_installed() {
     fi
     command -v "$(command_for_tool "$tool")" >/dev/null 2>&1
 }
-# User-local source recipes are deliberately few. Stow and tmux are handled by
-# their matching standalone entrypoints. The other recipes remain pinned
+# User-local source recipes are deliberately few. Stow, tmux, and Go are
+# handled by matching standalone entrypoints. The other recipes remain pinned
 # because they are unrelated to this source bootstrap.
 local_source_installer() {
     case "$1" in
         stow) printf '%s\n' "$SOURCE_STOW_INSTALLER" ;;
         tmux) printf '%s\n' "$SOURCE_TMUX_INSTALLER" ;;
+        go) printf '%s\n' "$SOURCE_GO_INSTALLER" ;;
         *) return 1 ;;
     esac
 }
@@ -227,7 +237,7 @@ local_recipe_supported() {
     local tool="$1"
     local installer
     case "$tool" in
-        stow|tmux)
+        stow|tmux|go)
             installer="$(local_source_installer "$tool")"
             if [ ! -x "$installer" ]; then
                 printf '%s\n' "No supported source installer for $tool: $installer" >&2
@@ -235,7 +245,7 @@ local_recipe_supported() {
             fi
             ;;
         fzf)
-            for prerequisite in git make go; do
+            for prerequisite in git make; do
                 command -v "$prerequisite" >/dev/null 2>&1 || {
                     printf '%s\n' "Missing local-build prerequisite for fzf: $prerequisite" >&2
                     return 1
@@ -310,12 +320,19 @@ install_local_tool() {
         [ "$status" -eq 0 ] || return "$status"
     fi
     case "$tool" in
+        go)
+            "$SOURCE_GO_INSTALLER" --prefix "$HOME/.local"
+            return $?
+            ;;
         fzf)
             source_dir="$BUILD_ROOT/fzf"
             clone_pinned_source "https://github.com/junegunn/fzf.git" "6765f464a60e39afc20775f54f7ba40896bf1b81" "$source_dir"
             status=$?
             [ "$status" -eq 0 ] || return "$status"
-            (cd "$source_dir" && make bin/fzf)
+            # Go must infer GOROOT from the bootstrapped executable; do not
+            # carry a stale user GOROOT into the local build.
+            # The shallow commit pin has no tags for upstream git describe.
+            (cd "$source_dir" && unset GOROOT && make bin/fzf FZF_VERSION=0.74.0 FZF_REVISION=6765f464)
             status=$?
             [ "$status" -eq 0 ] || return "$status"
             cp "$source_dir/bin/fzf" "$HOME/.local/bin/fzf"
@@ -352,6 +369,14 @@ SOURCE_STOW=false
 SOURCE_TMUX=false
 PREFLIGHT_FAILURE=false
 for tool in "${SPECIFIC_PACKAGES[@]}"; do
+    already_missing=false
+    for existing_tool in "${MISSING_TOOLS[@]}"; do
+        if [ "$existing_tool" = "$tool" ]; then
+            already_missing=true
+            break
+        fi
+    done
+    [ "$already_missing" = true ] && continue
     if is_tool_installed "$tool"; then
         printf '%s\n' "$tool is already installed; skipping."
         continue
@@ -359,11 +384,23 @@ for tool in "${SPECIFIC_PACKAGES[@]}"; do
     MISSING_TOOLS+=("$tool")
     LOCAL_MODE=false
     if [ "$USE_SUDO" = false ]; then
-        if [ "$PLATFORM" != macos ] || [ "$tool" = stow ] || [ "$tool" = tmux ]; then
+        if [ "$PLATFORM" != macos ] || \
+           [ "$tool" = stow ] || [ "$tool" = tmux ] || \
+           [ "$tool" = go ] || [ "$tool" = fzf ]; then
             LOCAL_MODE=true
         fi
     fi
     if [ "$LOCAL_MODE" = true ]; then
+        # fzf needs Go to compile, but a missing Go is itself a supported
+        # local dependency: queue the standalone bootstrap before fzf.
+        if [ "$tool" = fzf ] && ! is_tool_installed go; then
+            if local_recipe_supported go; then
+                MISSING_TOOLS+=("go")
+                LOCAL_TOOLS+=("go")
+            else
+                PREFLIGHT_FAILURE=true
+            fi
+        fi
         if local_recipe_supported "$tool"; then
             LOCAL_TOOLS+=("$tool")
             [ "$tool" = stow ] && SOURCE_STOW=true
@@ -413,13 +450,14 @@ if [ "$SOURCE_TMUX" = true ]; then
     fi
 fi
 
-if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
+if [ "$USE_SUDO" = false ]; then
     printf '%s\n' "Building remaining local tool(s) without sudo: ${LOCAL_TOOLS[*]}"
     for tool in "${LOCAL_TOOLS[@]}"; do
         case "$tool" in
             stow|tmux) continue ;;
+            go) printf '%s\n' 'Installing Go from the official release archive' ;;
+            *) printf '%s\n' "Building $tool from its pinned source revision" ;;
         esac
-        printf '%s\n' "Building $tool from its pinned source revision"
         install_local_tool "$tool"
         status=$?
         if [ "$status" -ne 0 ]; then
@@ -427,31 +465,20 @@ if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
             exit "$status"
         fi
     done
-    POST_FAILURE=false
-    for tool in "${MISSING_TOOLS[@]}"; do
-        if ! is_tool_installed "$tool"; then
-            printf '%s\n' "Local build completed but $tool is unavailable" >&2
-            POST_FAILURE=true
-        fi
-    done
-    [ "$POST_FAILURE" = false ] || exit 1
-    printf '%s\n' 'Local dependency installation complete.'
-    exit 0
-fi
-
-if [ "$USE_SUDO" = false ] && [ "$PLATFORM" = macos ] && \
-   [ "${#MANAGER_PACKAGES[@]}" -eq 0 ] && \
-   { [ "$SOURCE_STOW" = true ] || [ "$SOURCE_TMUX" = true ]; }; then
-    POST_FAILURE=false
-    for tool in "${MISSING_TOOLS[@]}"; do
-        if ! is_tool_installed "$tool"; then
-            printf '%s\n' "Local build completed but $tool is unavailable" >&2
-            POST_FAILURE=true
-        fi
-    done
-    [ "$POST_FAILURE" = false ] || exit 1
-    printf '%s\n' 'Local dependency installation complete.'
-    exit 0
+    # Linux no-sudo has no native manager path.  macOS may still have
+    # Homebrew packages queued, so continue to its manager only in that case.
+    if [ "$PLATFORM" != macos ] || [ "${#MANAGER_PACKAGES[@]}" -eq 0 ]; then
+        POST_FAILURE=false
+        for tool in "${MISSING_TOOLS[@]}"; do
+            if ! is_tool_installed "$tool"; then
+                printf '%s\n' "Local build completed but $tool is unavailable" >&2
+                POST_FAILURE=true
+            fi
+        done
+        [ "$POST_FAILURE" = false ] || exit 1
+        printf '%s\n' 'Local dependency installation complete.'
+        exit 0
+    fi
 fi
 
 MANAGER=''

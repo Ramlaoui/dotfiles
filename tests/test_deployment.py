@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Regression checks for the explicit dotfiles deployment phases."""
 
+import hashlib
 import os
 from pathlib import Path
 import shutil
 import stat
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -13,6 +15,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INSTALL = ROOT / "install.sh"
 DEPENDENCIES = ROOT / "scripts" / "installs" / "core-dependency.sh"
+GO_INSTALLER = ROOT / "scripts" / "misc" / "install_go.sh"
 
 
 class DeploymentTest(unittest.TestCase):
@@ -133,6 +136,133 @@ class DeploymentTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(sentinel.read_text(), "untouched\n")
         self.assertIn("GNU Stow", result.stdout)
+
+
+
+class GoInstallerTest(unittest.TestCase):
+    def test_checksum_failure_preserves_existing_install(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            home = root / "home"
+            prefix = home / ".local"
+            fake_bin = root / "bin"
+            payload = root / "payload" / "go" / "bin"
+            fake_bin.mkdir()
+            payload.mkdir(parents=True)
+            for name in ("go", "gofmt"):
+                path = payload / name
+                path.write_text("not a real Go binary\n")
+                path.chmod(0o755)
+
+            archive = root / "go1.99.1.linux-amd64.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                tar.add(payload.parent, arcname="go")
+            checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+            corrupt_archive = root / "corrupt.tar.gz"
+            corrupt_archive.write_bytes(archive.read_bytes() + b"corrupted\n")
+
+            old_root = prefix / "lib" / "go1.98.0" / "bin"
+            old_root.mkdir(parents=True)
+            for name in ("go", "gofmt"):
+                path = old_root / name
+                path.write_text("old installation\n")
+                path.chmod(0o755)
+            (prefix / "bin").mkdir(parents=True)
+            old_go_link = "../lib/go1.98.0/bin/go"
+            old_gofmt_link = "../lib/go1.98.0/bin/gofmt"
+            (prefix / "bin" / "go").symlink_to(old_go_link)
+            (prefix / "bin" / "gofmt").symlink_to(old_gofmt_link)
+
+            for command in (
+                "bash",
+                "cp",
+                "env",
+                "gzip",
+                "ln",
+                "mkdir",
+                "mktemp",
+                "mv",
+                "readlink",
+                "rm",
+                "sed",
+                "tar",
+                "tr",
+            ):
+                source = shutil.which(command)
+                if source is None:
+                    self.fail(f"required test utility is unavailable: {command}")
+                (fake_bin / command).symlink_to(source)
+            for command in ("sha256sum", "shasum"):
+                source = shutil.which(command)
+                if source:
+                    (fake_bin / command).symlink_to(source)
+                    break
+            uname = fake_bin / "uname"
+            uname.write_text('#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n')
+            uname.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                """#!/bin/sh
+set -eu
+output=
+url=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --output) output=$2; shift ;;
+        *) url=$1 ;;
+    esac
+    shift
+done
+case "$url" in
+    https://go.dev/VERSION?m=text)
+        printf '%s\\n' go1.99.1 > "$output"
+        ;;
+    'https://go.dev/dl/?mode=json&include=all')
+        printf '{"filename":"go1.99.1.linux-amd64.tar.gz","sha256":"%s"}\\n' "$GO_CHECKSUM" > "$output"
+        ;;
+    https://go.dev/dl/go1.99.1.linux-amd64.tar.gz)
+        cp "$CORRUPT_ARCHIVE" "$output"
+        ;;
+    *) exit 1 ;;
+esac
+"""
+            )
+            curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home),
+                    "PATH": str(fake_bin),
+                    "GO_CHECKSUM": checksum,
+                    "CORRUPT_ARCHIVE": str(corrupt_archive),
+                }
+            )
+            result = subprocess.run(
+                [str(GO_INSTALLER)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertEqual((prefix / "bin" / "go").readlink(), Path(old_go_link))
+            self.assertEqual((prefix / "bin" / "gofmt").readlink(), Path(old_gofmt_link))
+            self.assertEqual((old_root / "go").read_text(), "old installation\n")
+            self.assertFalse((prefix / "lib" / "go1.99.1").exists())
+            # The same upgrade must succeed with the authentic archive, so an
+            # earlier parser/preflight failure cannot masquerade as protection.
+            env["CORRUPT_ARCHIVE"] = str(archive)
+            accepted = subprocess.run(
+                [str(GO_INSTALLER)], cwd=ROOT, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stdout)
+            self.assertEqual((prefix / "bin" / "go").read_text(), "not a real Go binary\n")
+            self.assertEqual((old_root / "go").read_text(), "old installation\n")
 
 
 class DependencyAdapterTest(unittest.TestCase):
