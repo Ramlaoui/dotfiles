@@ -124,8 +124,13 @@ Prefixes must be absolute paths without whitespace (an upstream build limitation
   revision and install missing plugins; sync itself does not run Neovim or install
   its plugins. Lazy also checks for plugin updates.
 - `tmux/.config/tmux/scripts/`: installed sidebar/worktree and pane borrowing/return
-  helpers (tmux and fzf required for interactive pane selection). Optional
-  tmux-switcher configuration uses `TMUX_SWITCHER_PATH`, not a host-specific path.
+  helpers (tmux and fzf required for interactive pane selection).
+- `tmux-switcher` is installed through TPM (`Ramlaoui/tmux-switcher`) and requires
+  `uv`, a recent `fzf` (verified with 0.74.3; 0.56.0 cannot open the picker),
+  and Python 3.11+ (which uv can provision). Reload tmux with
+  prefix+r, then press prefix+I to install plugins. Prefix+Ctrl-J opens the
+  switcher with pane previews; before the plugin is installed, the same key
+  opens a basic fzf session picker. The prefix is Ctrl-Space.
 - `zen/.config/zen/README.md`: manual, locked profile patching and backup restoration.
 ## OMP preferences
 
