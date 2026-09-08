@@ -44,18 +44,16 @@ your login shell, install plugins, or apply desktop defaults. Restart applicatio
 or reload their configuration deliberately after reviewing the links. Shell
 plugins must be installed separately; shell startup never downloads them.
 
-## Dependencies
-
 `scripts/installs/core-dependency.sh --help` lists canonical tool names. Native
-package adapters translate them into platform package names and preserve argument
-boundaries and failure statuses. Git LFS is included because the Git configuration
-uses its filters. `uv` and `blesh` are optional.
+package adapters translate them into platform package names and preserve
+argument boundaries and failure statuses. Git LFS is included because the Git
+configuration uses its filters. `uv` and `blesh` are optional.
 
-`--no-sudo` never invokes sudo. Missing tools without a supported local recipe fail
-explicitly rather than attempting a privileged installation. Stow and tmux delegate
-to the standalone source installers below; other local recipes use pinned
-revisions. Build failures propagate. Not every core dependency has a local recipe.
-Bootstrap scripts are not fetched and piped into a shell.
+`--no-sudo` never invokes sudo. Missing tools without a supported local recipe
+fail explicitly rather than attempting a privileged installation. Stow, tmux,
+and Go delegate to their standalone source installers below; fzf is built from
+its pinned source revision. Build failures propagate. Not every core dependency
+has a local recipe. Bootstrap scripts are not fetched and piped into a shell.
 
 ### Latest Stow and tmux from source (no sudo)
 
@@ -99,14 +97,47 @@ build directory and stages its files before copying into the chosen prefix.
 The final copy is not an atomic transaction. Neither installer changes shell
 configuration or restarts a running tmux. Network access is required.
 
-The two entrypoints own their recipes. `scripts/installs/source-common.sh` only
-shares common installation mechanics; there is no combined installer or recipe
-registry.
+The standalone entrypoints own their recipes. `scripts/installs/source-common.sh`
+only shares common installation mechanics; there is no combined installer or
+recipe registry.
 
 The general `./install.sh deps --no-sudo stow tmux` path calls these same scripts
 for missing tools. Use the standalone commands above to upgrade an already
 installed version. Change PATH deliberately to select the new binaries.
 Prefixes must be absolute paths without whitespace (an upstream build limitation).
+
+### Official Go and fzf bootstrap (no sudo)
+
+```bash
+# Install the complete Go distribution into ~/.local/lib and managed links into
+# ~/.local/bin; no shell startup files are changed.
+bash scripts/misc/install_go.sh
+export PATH="$HOME/.local/bin:$PATH"
+go version
+
+# On Linux, including distro environments without a native adapter (such as
+# SLES on LUMI), this bootstraps Go first when fzf is missing, then builds the
+# pinned fzf revision locally without sudo.
+./install.sh deps --no-sudo --auto-yes fzf
+fzf --version
+
+# Choose a prefix or exact stable release:
+bash scripts/misc/install_go.sh --prefix "$HOME/local" --version 1.25.1
+```
+
+Go releases are selected from the official stable version endpoint and their
+archive SHA-256 is matched against official `go.dev` release metadata before
+extraction. The full versioned GOROOT remains intact under `PREFIX/lib`; only
+managed `go` and `gofmt` symlinks are placed in `PREFIX/bin`. The installer
+never sets `GOROOT` or edits `PATH`; add `PREFIX/bin` to `PATH` deliberately.
+Linux and macOS amd64/arm64 are supported. Prefixes must be absolute paths
+without whitespace. A regular file, directory, or unrelated symlink already
+occupying either managed binary name is rejected without clobbering it.
+
+The no-sudo Linux path does not inspect or impersonate a distro package manager:
+it uses only deterministic local recipes. Missing Go is the only implicit fzf
+prerequisite it bootstraps; Git and make must already be available. Other
+unsupported recipes still fail before mutation.
 
 ## Configuration ownership
 
