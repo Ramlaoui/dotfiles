@@ -828,6 +828,31 @@ class DependencyAdapterTest(unittest.TestCase):
         self.assertNotIn("Package manager", result.stdout)
         self.assertFalse(self.log.exists())
 
+    def test_stale_managed_fzf_refuses_repair_without_build_prerequisite(self):
+        managed_bin = Path(self.env["HOME"]) / ".local" / "bin" / "fzf"
+        managed_bin.parent.mkdir(parents=True)
+        old_binary = "#!/bin/sh\nprintf '0.74.0 (6765f464)\\n'\n"
+        managed_bin.write_text(old_binary)
+        managed_bin.chmod(0o755)
+        old_mode = stat.S_IMODE(managed_bin.stat().st_mode)
+
+        result = self.run_deps("--no-sudo", "--auto-yes", "fzf")
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(managed_bin.read_text(), old_binary)
+        self.assertEqual(stat.S_IMODE(managed_bin.stat().st_mode), old_mode)
+        self.assertFalse(
+            (Path(self.env["HOME"]) / ".local" / "share" / "fzf" / "shell").exists()
+        )
+
+    def test_external_fzf_without_integration_scripts_remains_accepted(self):
+        self.write_executable("fzf", "#!/bin/sh\nprintf 'external fzf\\n'\n")
+
+        result = self.run_deps("--no-sudo", "--auto-yes", "fzf")
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertFalse((Path(self.env["HOME"]) / ".local" / "bin" / "fzf").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

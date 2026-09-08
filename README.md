@@ -141,6 +141,13 @@ it uses only deterministic local recipes. Missing Go is the only implicit fzf
 prerequisite it bootstraps; Git and make must already be available. Other
 unsupported recipes still fail before mutation.
 
+The pinned fzf 0.74.0 recipe installs its binary at
+`$HOME/.local/bin/fzf` and its Bash integration scripts under
+`$HOME/.local/share/fzf/shell/`: `completion.bash` and `key-bindings.bash`.
+Rerun `./install.sh deps --no-sudo --auto-yes fzf` to repair an older managed
+install that contains only the binary. The recipe does not edit shell startup
+files or change the fzf pin.
+
 ### User-local uv and Neovim toolchain
 
 ```bash

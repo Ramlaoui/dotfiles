@@ -213,7 +213,7 @@ command_for_tool() {
 
 is_tool_installed() {
     local tool="$1"
-    local version
+    local version tool_path
     if [ "$tool" = neovim ]; then
         version="$(nvim --version 2>/dev/null)" || return 1
         [[ "$version" =~ ^NVIM[[:space:]]v([0-9]+)\.([0-9]+)\.([0-9]+) ]] || return 1
@@ -226,6 +226,17 @@ is_tool_installed() {
         [ "${BASH_REMATCH[1]}" -gt 0 ] || [ "${BASH_REMATCH[2]}" -gt 26 ] || \
             { [ "${BASH_REMATCH[2]}" -eq 26 ] && [ "${BASH_REMATCH[3]}" -ge 1 ]; }
         return $?
+    fi
+    if [ "$tool" = fzf ]; then
+        tool_path="$(command -v fzf)" || return 1
+        # Our local install includes the scripts consumed by ble.sh.  Leave
+        # externally managed fzf installations under their owner's policy.
+        if [ "$tool_path" = "$HOME/.local/bin/fzf" ]; then
+            [ -r "$HOME/.local/share/fzf/shell/completion.bash" ] && \
+                [ -r "$HOME/.local/share/fzf/shell/key-bindings.bash" ]
+            return $?
+        fi
+        return 0
     fi
     if [ "$tool" = blesh ]; then
         [ -r "${XDG_DATA_HOME:-$HOME/.local/share}/blesh/ble.sh" ]
@@ -359,6 +370,14 @@ install_local_tool() {
             # carry a stale user GOROOT into the local build.
             # The shallow commit pin has no tags for upstream git describe.
             (cd "$source_dir" && unset GOROOT && make bin/fzf FZF_VERSION=0.74.0 FZF_REVISION=6765f464)
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            # ble.sh discovers these relative to the executable's prefix.
+            # Keep scripts from the same pin before the checkout is removed.
+            mkdir -p "$HOME/.local/share/fzf/shell"
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            cp "$source_dir/shell/completion.bash" "$source_dir/shell/key-bindings.bash" "$HOME/.local/share/fzf/shell/"
             status=$?
             [ "$status" -eq 0 ] || return "$status"
             cp "$source_dir/bin/fzf" "$HOME/.local/bin/fzf"
