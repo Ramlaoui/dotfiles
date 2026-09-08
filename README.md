@@ -57,6 +57,12 @@ to the standalone source installers below; other local recipes use pinned
 revisions. Build failures propagate. Not every core dependency has a local recipe.
 Bootstrap scripts are not fetched and piped into a shell.
 
+On macOS, explicitly requesting `blesh` uses its pinned user-local source recipe,
+including with `--no-sudo`. Install GNU awk with `brew install gawk` first, then
+run `./install.sh deps --no-sudo --auto-yes blesh`. See
+[Bash setup](bash/README.md#blesh-on-macos) for prerequisites, XDG paths, and
+safe migration of existing Bash startup files.
+
 ### Latest Stow and tmux from source (no sudo)
 
 ```bash

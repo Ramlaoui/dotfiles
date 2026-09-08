@@ -243,12 +243,22 @@ local_recipe_supported() {
             done
             ;;
         blesh)
-            for prerequisite in git make; do
+            for prerequisite in git make gawk; do
                 command -v "$prerequisite" >/dev/null 2>&1 || {
                     printf '%s\n' "Missing local-build prerequisite for blesh: $prerequisite" >&2
+                    if [ "$PLATFORM" = macos ] && [ "$prerequisite" = gawk ]; then
+                        printf '%s\n' 'Install it with: brew install gawk' >&2
+                    fi
                     return 1
                 }
             done
+            case "$(make --version 2>/dev/null)" in
+                *"GNU Make"*) ;;
+                *)
+                    printf '%s\n' 'GNU make is required to build blesh; make must resolve to GNU make' >&2
+                    return 1
+                    ;;
+            esac
             ;;
         *)
             printf '%s\n' "No supported deterministic local recipe for $tool" >&2
@@ -330,7 +340,18 @@ install_local_tool() {
             clone_pinned_source "https://github.com/akinomyoga/ble.sh.git" "1a5c451c8baa71439a6be4ea0f92750de35a7620" "$source_dir"
             status=$?
             [ "$status" -eq 0 ] || return "$status"
-            (cd "$source_dir" && make install PREFIX="$HOME/.local")
+            git -C "$source_dir" submodule update --init --depth 1 -- contrib
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            # Make treats whitespace in target paths as separators. Stage using
+            # a relative path, then copy to the user's possibly spaced XDG path.
+            (cd "$source_dir" && make install INSDIR=out-install)
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/blesh"
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            cp -R "$source_dir/out-install/." "${XDG_DATA_HOME:-$HOME/.local/share}/blesh/"
             status=$?
             [ "$status" -eq 0 ] || return "$status"
             ;;
@@ -358,7 +379,9 @@ for tool in "${SPECIFIC_PACKAGES[@]}"; do
     fi
     MISSING_TOOLS+=("$tool")
     LOCAL_MODE=false
-    if [ "$USE_SUDO" = false ]; then
+    if [ "$PLATFORM" = macos ] && [ "$tool" = blesh ]; then
+        LOCAL_MODE=true
+    elif [ "$USE_SUDO" = false ]; then
         if [ "$PLATFORM" != macos ] || [ "$tool" = stow ] || [ "$tool" = tmux ]; then
             LOCAL_MODE=true
         fi
@@ -394,6 +417,37 @@ if [ "${#MISSING_TOOLS[@]}" -eq 0 ]; then
     exit 0
 fi
 
+if [ "${#MANAGER_PACKAGES[@]}" -gt 0 ]; then
+    MANAGER=''
+    case "$PLATFORM" in
+        macos) MANAGER=brew ;;
+        arch) MANAGER=pacman ;;
+        debian) MANAGER=apt-get ;;
+    esac
+
+    if ! command -v "$MANAGER" >/dev/null 2>&1; then
+        printf '%s\n' "Required package manager is not installed: $MANAGER" >&2
+        exit 1
+    fi
+    if [ "$PLATFORM" = debian ]; then
+        if ! command -v apt-cache >/dev/null 2>&1; then
+            printf '%s\n' 'apt-cache is required to verify Debian package availability before installation' >&2
+            exit 1
+        fi
+        for package_name in "${MANAGER_PACKAGES[@]}"; do
+            package_info="$(apt-cache show "$package_name" 2>/dev/null || true)"
+            if [ -z "$package_info" ]; then
+                printf '%s\n' "Debian package is unavailable in the configured repositories: $package_name" >&2
+                PREFLIGHT_FAILURE=true
+            fi
+        done
+        [ "$PREFLIGHT_FAILURE" = false ] || exit 1
+    fi
+    if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ] && ! command -v sudo >/dev/null 2>&1; then
+        printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
+        exit 1
+    fi
+fi
 if [ "$SOURCE_STOW" = true ]; then
     printf '%s\n' 'Delegating stow to its standalone source installer without sudo'
     "$SOURCE_STOW_INSTALLER" --prefix "$HOME/.local"
@@ -413,116 +467,45 @@ if [ "$SOURCE_TMUX" = true ]; then
     fi
 fi
 
-if [ "$USE_SUDO" = false ] && [ "$PLATFORM" != macos ]; then
-    printf '%s\n' "Building remaining local tool(s) without sudo: ${LOCAL_TOOLS[*]}"
-    for tool in "${LOCAL_TOOLS[@]}"; do
-        case "$tool" in
-            stow|tmux) continue ;;
-        esac
-        printf '%s\n' "Building $tool from its pinned source revision"
-        install_local_tool "$tool"
-        status=$?
-        if [ "$status" -ne 0 ]; then
-            printf '%s\n' "Local build failed for $tool (status $status)" >&2
-            exit "$status"
-        fi
-    done
-    POST_FAILURE=false
-    for tool in "${MISSING_TOOLS[@]}"; do
-        if ! is_tool_installed "$tool"; then
-            printf '%s\n' "Local build completed but $tool is unavailable" >&2
-            POST_FAILURE=true
-        fi
-    done
-    [ "$POST_FAILURE" = false ] || exit 1
-    printf '%s\n' 'Local dependency installation complete.'
-    exit 0
-fi
-
-if [ "$USE_SUDO" = false ] && [ "$PLATFORM" = macos ] && \
-   [ "${#MANAGER_PACKAGES[@]}" -eq 0 ] && \
-   { [ "$SOURCE_STOW" = true ] || [ "$SOURCE_TMUX" = true ]; }; then
-    POST_FAILURE=false
-    for tool in "${MISSING_TOOLS[@]}"; do
-        if ! is_tool_installed "$tool"; then
-            printf '%s\n' "Local build completed but $tool is unavailable" >&2
-            POST_FAILURE=true
-        fi
-    done
-    [ "$POST_FAILURE" = false ] || exit 1
-    printf '%s\n' 'Local dependency installation complete.'
-    exit 0
-fi
-
-MANAGER=''
-case "$PLATFORM" in
-    macos) MANAGER=brew ;;
-    arch) MANAGER=pacman ;;
-    debian) MANAGER=apt-get ;;
-esac
-
-if ! command -v "$MANAGER" >/dev/null 2>&1; then
-    printf '%s\n' "Required package manager is not installed: $MANAGER" >&2
-    exit 1
-fi
-if [ "$PLATFORM" = debian ]; then
-    if ! command -v apt-cache >/dev/null 2>&1; then
-        printf '%s\n' 'apt-cache is required to verify Debian package availability before installation' >&2
-        exit 1
+for tool in "${LOCAL_TOOLS[@]}"; do
+    case "$tool" in
+        stow|tmux) continue ;;
+    esac
+    printf '%s\n' "Building $tool from its pinned source revision"
+    install_local_tool "$tool"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' "Local build failed for $tool (status $status)" >&2
+        exit "$status"
     fi
-    for package_name in "${MANAGER_PACKAGES[@]}"; do
-        package_info="$(apt-cache show "$package_name" 2>/dev/null || true)"
-        if [ -z "$package_info" ]; then
-            printf '%s\n' "Debian package is unavailable in the configured repositories: $package_name" >&2
-            PREFLIGHT_FAILURE=true
-        fi
-    done
-    [ "$PREFLIGHT_FAILURE" = false ] || exit 1
+done
+
+if [ "${#MANAGER_PACKAGES[@]}" -gt 0 ]; then
+    printf '%s\n' "Installing package(s): ${MANAGER_PACKAGES[*]}"
+    case "$PLATFORM" in
+        macos)
+            brew install "${MANAGER_PACKAGES[@]}"
+            ;;
+        arch)
+            sudo pacman -S --needed --noconfirm "${MANAGER_PACKAGES[@]}"
+            ;;
+        debian)
+            sudo apt-get install -y "${MANAGER_PACKAGES[@]}"
+            ;;
+    esac
+    status=$?
+    if [ "$status" -ne 0 ]; then
+        printf '%s\n' "Package manager failed (status $status)" >&2
+        exit "$status"
+    fi
 fi
-if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ] && ! command -v sudo >/dev/null 2>&1; then
-    printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
-    exit 1
-fi
 
-printf '%s\n' "Installing package(s): ${MANAGER_PACKAGES[*]}"
-case "$PLATFORM" in
-    macos)
-        if brew install "${MANAGER_PACKAGES[@]}"; then
-            :
-        else
-            status=$?
-            printf '%s\n' "Package manager failed (status $status)" >&2
-            exit "$status"
-        fi
-        ;;
-    arch)
-        if sudo pacman -S --needed --noconfirm "${MANAGER_PACKAGES[@]}"; then
-            :
-        else
-            status=$?
-            printf '%s\n' "Package manager failed (status $status)" >&2
-            exit "$status"
-        fi
-        ;;
-    debian)
-        if sudo apt-get install -y "${MANAGER_PACKAGES[@]}"; then
-            :
-        else
-            status=$?
-            printf '%s\n' "Package manager failed (status $status)" >&2
-            exit "$status"
-        fi
-        ;;
-esac
-
-
-# Do not claim success merely because a manager returned zero.  Verify every
-# requested command after the transaction, preserving the manager's truthful
-# failure semantics.
+# Do not claim success merely because an installer returned zero. Verify every
+# requested tool after both source and package-manager installations.
 POST_FAILURE=false
-for tool in "${MISSING_TOOLS[@]}"; do
+for tool in "${SPECIFIC_PACKAGES[@]}"; do
     if ! is_tool_installed "$tool"; then
-        printf '%s\n' "Package manager reported success but $tool is unavailable" >&2
+        printf '%s\n' "Dependency installation reported success but $tool is unavailable" >&2
         POST_FAILURE=true
     fi
 done
