@@ -194,6 +194,29 @@ policy, command or agent rules, prompts, extensions, session/history databases,
 logs, caches, and other runtime state are intentionally excluded. Keep those
 machine-local and restore or migrate them separately.
 
+## OMP context defaults
+
+`scripts/installs/omp-context-defaults.sh` restores one behavioral OMP
+setting: `compaction.thresholdTokens=272000`. This is deliberately not part
+of `scripts/installs/omp-preferences.yml` — that template is a closed,
+cosmetics-only allowlist, and a compaction threshold is runtime behavior, not
+a UI preference.
+
+The default (unset) threshold lets a session grow to roughly 85% of a
+model's raw context window before OMP compacts it. `272000` matches the
+point at which several Codex-family models roughly double their per-token
+price (their `cost.longContext` tier) and keeps sessions well clear of
+context rot — degraded recall as token count grows, well within the
+advertised window (see Anthropic's [Effective context engineering for AI
+agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)).
+
+It is a single global knob shared by every model, idempotent, and not wired
+into `install.sh`; run it manually after installing OMP:
+
+```bash
+scripts/installs/omp-context-defaults.sh
+```
+
 ## Desktop safety
 
 Clipboard history is disabled unless `ROFI_CLIPBOARD_HISTORY=1` is exported.
