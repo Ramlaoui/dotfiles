@@ -47,13 +47,15 @@ plugins must be installed separately; shell startup never downloads them.
 `scripts/installs/core-dependency.sh --help` lists canonical tool names. Native
 package adapters translate them into platform package names and preserve
 argument boundaries and failure statuses. Git LFS is included because the Git
-configuration uses its filters. `uv` and `blesh` are optional.
+configuration uses its filters. `uv` is a core dependency; `delta` and `blesh`
+are optional. Git uses its standard pager and interactive diff display without
+requiring delta.
 
 `--no-sudo` never invokes sudo. Missing tools without a supported local recipe
 fail explicitly rather than attempting a privileged installation. Stow, tmux,
-and Go delegate to their standalone source installers below; fzf is built from
-its pinned source revision. Build failures propagate. Not every core dependency
-has a local recipe. Bootstrap scripts are not fetched and piped into a shell.
+Go, uv, Neovim, and Tree-sitter delegate to standalone installers; fzf retains
+its pinned source build. Failures propagate. Not every core dependency has a
+local recipe. Bootstrap scripts are not fetched and piped into a shell.
 
 ### Latest Stow and tmux from source (no sudo)
 
@@ -116,7 +118,7 @@ export PATH="$HOME/.local/bin:$PATH"
 go version
 
 # On Linux, including distro environments without a native adapter (such as
-# SLES on LUMI), this bootstraps Go first when fzf is missing, then builds the
+# SLES), this bootstraps Go first when fzf is missing, then builds the
 # pinned fzf revision locally without sudo.
 ./install.sh deps --no-sudo --auto-yes fzf
 fzf --version
@@ -138,6 +140,58 @@ The no-sudo Linux path does not inspect or impersonate a distro package manager:
 it uses only deterministic local recipes. Missing Go is the only implicit fzf
 prerequisite it bootstraps; Git and make must already be available. Other
 unsupported recipes still fail before mutation.
+
+The pinned fzf 0.74.0 recipe installs its binary at
+`$HOME/.local/bin/fzf` and its Bash integration scripts under
+`$HOME/.local/share/fzf/shell/`: `completion.bash` and `key-bindings.bash`.
+Rerun `./install.sh deps --no-sudo --auto-yes fzf` to repair an older managed
+install that contains only the binary. The recipe does not edit shell startup
+files or change the fzf pin.
+
+### User-local uv and Neovim toolchain
+
+```bash
+# Works without a distro package manager, including SLES.
+# Requesting Neovim also includes its Tree-sitter CLI dependency.
+./install.sh deps --no-sudo --auto-yes uv neovim
+export PATH="$HOME/.local/bin:$PATH"
+uv --version
+nvim --version
+tree-sitter --version
+
+# Standalone installs also accept a prefix and an exact version.
+bash scripts/misc/install_uv.sh --prefix "$HOME/local" --version 0.12.10
+bash scripts/misc/install_neovim.sh --prefix "$HOME/local" --version 0.12.5
+bash scripts/misc/install_tree_sitter.sh --prefix "$HOME/local" --version 0.27.0 --jobs 2
+```
+
+uv, Neovim, and Tree-sitter use user-local installers even in native
+package-manager runs. The tracked editor configuration requires Neovim 0.12+
+and Tree-sitter CLI 0.26.1+; older or nonfunctional binaries do not satisfy the
+dependency check. uv itself does not require a system Python. Python versions
+needed by uv-managed projects can be provisioned by uv separately.
+
+New release archives are checked against official SHA-256 metadata before
+extraction or execution. Neovim's complete `bin`, `lib`, and `share` runtime
+stays together under `PREFIX/lib`; uv and Tree-sitter also keep versioned roots
+there. `PREFIX/bin` contains managed links. Unrelated files, links, and release
+roots are refused rather than overwritten.
+
+Tree-sitter's official Linux binary can require a newer glibc than the host
+provides. In that case, its installer builds the **same version** with
+`cargo install --locked`. A native C compiler must already be available (`CC`
+or `cc`). Compatible existing Rust is reused; otherwise only Cargo, rustc,
+and rust-std are temporarily installed from checksum-verified official Rust
+components. Temporary toolchains and build state are removed, without editing
+Rust, rustup, or shell configuration. `--jobs` or `CARGO_BUILD_JOBS` bounds the
+source build. A failed checksum or download never triggers this fallback.
+
+Put `PREFIX/bin` on PATH **before** launching Neovim so LazyVim finds the
+compatible CLI instead of downloading another copy through Mason. If an
+existing Mason installation already contains an incompatible `tree-sitter-cli`,
+remove that package with `:MasonUninstall tree-sitter-cli`, then restart Neovim.
+The installers do not modify Mason or plugin state; first-launch plugin
+installation still needs Git, network access, and a working C compiler.
 
 ## Configuration ownership
 

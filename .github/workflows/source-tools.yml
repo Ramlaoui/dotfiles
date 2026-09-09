@@ -6,6 +6,9 @@ on:
       - 'scripts/misc/install_stow.sh'
       - 'scripts/misc/install_tmux.sh'
       - 'scripts/misc/install_go.sh'
+      - 'scripts/misc/install_uv.sh'
+      - 'scripts/misc/install_neovim.sh'
+      - 'scripts/misc/install_tree_sitter.sh'
       - 'scripts/installs/source-common.sh'
       - 'scripts/installs/core-dependency.sh'
       - '.github/workflows/source-tools.yml'
@@ -19,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-22.04, macos-14]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
@@ -37,6 +40,39 @@ jobs:
           "$prefix/bin/gofmt" -w "$RUNNER_TEMP/probe.go"
           "$prefix/bin/go" build -o "$RUNNER_TEMP/probe" "$RUNNER_TEMP/probe.go"
           test "$("$RUNNER_TEMP/probe")" = go-smoke-ok
+      - name: Install and exercise uv, Neovim, and Tree-sitter
+        run: |
+          prefix="$RUNNER_TEMP/source-tools"
+          bash scripts/misc/install_uv.sh --prefix "$prefix"
+          bash scripts/misc/install_neovim.sh --prefix "$prefix"
+          bash scripts/misc/install_tree_sitter.sh --prefix "$prefix" --jobs 2
+          mkdir -p "$RUNNER_TEMP/tree-sitter-smoke/src"
+          cat > "$RUNNER_TEMP/tree-sitter-smoke/src/grammar.json" <<'JSON'
+          {"name":"smoke","rules":{"source_file":{"type":"REPEAT","content":{"type":"SYMBOL","name":"word"}},"word":{"type":"PATTERN","value":"[a-z]+"}},"extras":[{"type":"PATTERN","value":"\\s"}]}
+          JSON
+          (
+            cd "$RUNNER_TEMP/tree-sitter-smoke"
+            "$prefix/bin/tree-sitter" generate src/grammar.json --abi 14
+            "$prefix/bin/tree-sitter" build --output "$RUNNER_TEMP/tree-sitter-smoke/smoke.so"
+          )
+          export UV_CACHE_DIR="$RUNNER_TEMP/uv-cache"
+          "$prefix/bin/uv" venv --python "$(command -v python3)" "$RUNNER_TEMP/uv-smoke"
+          "$RUNNER_TEMP/uv-smoke/bin/python" -c 'import sys; assert sys.prefix != sys.base_prefix'
+          cat > "$RUNNER_TEMP/editor-probe.lua" <<'LUA'
+          vim.cmd('filetype on')
+          vim.cmd.edit(vim.env.RUNNER_TEMP .. '/nvim-smoke.lua')
+          vim.api.nvim_buf_set_lines(0, 0, -1, false, {'local installed = true'})
+          vim.cmd.write()
+          assert(vim.bo.filetype == 'lua')
+          local parser = vim.treesitter.get_string_parser('local installed = true', 'lua')
+          assert(not parser:parse()[1]:root():has_error())
+          vim.treesitter.language.add('smoke', {path = vim.env.RUNNER_TEMP .. '/tree-sitter-smoke/smoke.so'})
+          local generated = vim.treesitter.get_string_parser('installed', 'smoke'):parse()[1]:root()
+          assert(not generated:has_error())
+          assert(generated:named_child(0):type() == 'word')
+          LUA
+          "$prefix/bin/nvim" --headless --clean -u NONE -n -l "$RUNNER_TEMP/editor-probe.lua"
+          test "$(cat "$RUNNER_TEMP/nvim-smoke.lua")" = 'local installed = true'
       - name: Build latest stable Stow
         run: bash scripts/misc/install_stow.sh --prefix "$RUNNER_TEMP/source-tools" --jobs 2
       - name: Build latest stable tmux and pinned local dependencies

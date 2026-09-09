@@ -22,14 +22,17 @@ SCRIPT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR" 2>/dev/null && pwd -P)" || exit 1
 SOURCE_STOW_INSTALLER="$SCRIPT_DIR/../misc/install_stow.sh"
 SOURCE_TMUX_INSTALLER="$SCRIPT_DIR/../misc/install_tmux.sh"
 SOURCE_GO_INSTALLER="$SCRIPT_DIR/../misc/install_go.sh"
+SOURCE_UV_INSTALLER="$SCRIPT_DIR/../misc/install_uv.sh"
+SOURCE_NEOVIM_INSTALLER="$SCRIPT_DIR/../misc/install_neovim.sh"
+SOURCE_TREE_SITTER_INSTALLER="$SCRIPT_DIR/../misc/install_tree_sitter.sh"
 RESET='\033[0m'
 
 core_packages=(
-    git curl cmake venv neovim fd delta lazygit bat eza tldr zsh htop fzf go
+    git curl cmake venv neovim tree-sitter fd lazygit bat eza tldr zsh htop fzf go uv
     tmux stow ripgrep git-lfs jq starship node npm
 )
 optional_packages=(
-    uv blesh
+    delta blesh
 )
 
 USE_SUDO=true
@@ -95,6 +98,18 @@ for package in "${SPECIFIC_PACKAGES[@]}"; do
     fi
 done
 
+# The tracked Neovim configuration builds parsers on first launch. Supply its
+# CLI before LazyVim can fall back to an incompatible Mason release binary.
+needs_tree_sitter=false
+has_tree_sitter=false
+for package in "${SPECIFIC_PACKAGES[@]}"; do
+    [ "$package" = neovim ] && needs_tree_sitter=true
+    [ "$package" = tree-sitter ] && has_tree_sitter=true
+done
+if [ "$needs_tree_sitter" = true ] && [ "$has_tree_sitter" = false ]; then
+    SPECIFIC_PACKAGES+=("tree-sitter")
+fi
+
 if [ "$AUTO_YES" = false ]; then
     if [ ! -t 0 ]; then
         printf '%s\n' 'Dependency installation needs confirmation; use --auto-yes in a non-interactive shell.' >&2
@@ -117,7 +132,7 @@ if [ "$OS_NAME" = Darwin ] || [ "$OS_NAME" = macOS ]; then
     PLATFORM=macos
 elif [ "$OS_NAME" = Linux ]; then
     # A no-sudo request must remain usable on distributions without a native
-    # adapter (for example SLES on LUMI): local recipes do not need a distro
+    # adapter (for example SLES): local recipes do not need a distro
     # identity.  Sudo-backed requests still require an explicit supported
     # native adapter below.
     if [ "$USE_SUDO" = false ]; then
@@ -160,8 +175,6 @@ platform_package_name() {
         arch:cmake|debian:cmake|macos:cmake) printf '%s\n' cmake ;;
         arch:venv|arch:python|macos:venv|macos:python) printf '%s\n' python ;;
         debian:venv) printf '%s\n' python3-venv ;;
-        arch:neovim|macos:neovim) printf '%s\n' neovim ;;
-        debian:neovim) printf '%s\n' neovim ;;
         arch:fd|macos:fd) printf '%s\n' fd ;;
         debian:fd) printf '%s\n' fd-find ;;
         arch:delta|debian:delta|macos:delta) printf '%s\n' git-delta ;;
@@ -184,9 +197,6 @@ platform_package_name() {
         macos:node) printf '%s\n' node ;;
         arch:npm|debian:npm) printf '%s\n' npm ;;
         macos:npm) printf '%s\n' node ;;
-        macos:uv) printf '%s\n' uv ;;
-        arch:uv) printf '%s\n' uv ;;
-        # uv is not a package in the supported Debian base repositories.
         *) return 1 ;;
     esac
 }
@@ -203,6 +213,31 @@ command_for_tool() {
 
 is_tool_installed() {
     local tool="$1"
+    local version tool_path
+    if [ "$tool" = neovim ]; then
+        version="$(nvim --version 2>/dev/null)" || return 1
+        [[ "$version" =~ ^NVIM[[:space:]]v([0-9]+)\.([0-9]+)\.([0-9]+) ]] || return 1
+        [ "${BASH_REMATCH[1]}" -gt 0 ] || [ "${BASH_REMATCH[2]}" -ge 12 ]
+        return $?
+    fi
+    if [ "$tool" = tree-sitter ]; then
+        version="$(tree-sitter --version 2>/dev/null)" || return 1
+        [[ "$version" =~ ^tree-sitter[[:space:]]([0-9]+)\.([0-9]+)\.([0-9]+) ]] || return 1
+        [ "${BASH_REMATCH[1]}" -gt 0 ] || [ "${BASH_REMATCH[2]}" -gt 26 ] || \
+            { [ "${BASH_REMATCH[2]}" -eq 26 ] && [ "${BASH_REMATCH[3]}" -ge 1 ]; }
+        return $?
+    fi
+    if [ "$tool" = fzf ]; then
+        tool_path="$(command -v fzf)" || return 1
+        # Our local install includes the scripts consumed by ble.sh.  Leave
+        # externally managed fzf installations under their owner's policy.
+        if [ "$tool_path" = "$HOME/.local/bin/fzf" ]; then
+            [ -r "$HOME/.local/share/fzf/shell/completion.bash" ] && \
+                [ -r "$HOME/.local/share/fzf/shell/key-bindings.bash" ]
+            return $?
+        fi
+        return 0
+    fi
     if [ "$tool" = blesh ]; then
         [ -r "${XDG_DATA_HOME:-$HOME/.local/share}/blesh/ble.sh" ]
         return $?
@@ -221,14 +256,16 @@ is_tool_installed() {
     fi
     command -v "$(command_for_tool "$tool")" >/dev/null 2>&1
 }
-# User-local source recipes are deliberately few. Stow, tmux, and Go are
-# handled by matching standalone entrypoints. The other recipes remain pinned
-# because they are unrelated to this source bootstrap.
+# Standalone installers own the source and verified-binary recipes below.
+# fzf and ble.sh retain their pinned Git build recipes.
 local_source_installer() {
     case "$1" in
         stow) printf '%s\n' "$SOURCE_STOW_INSTALLER" ;;
         tmux) printf '%s\n' "$SOURCE_TMUX_INSTALLER" ;;
         go) printf '%s\n' "$SOURCE_GO_INSTALLER" ;;
+        uv) printf '%s\n' "$SOURCE_UV_INSTALLER" ;;
+        neovim) printf '%s\n' "$SOURCE_NEOVIM_INSTALLER" ;;
+        tree-sitter) printf '%s\n' "$SOURCE_TREE_SITTER_INSTALLER" ;;
         *) return 1 ;;
     esac
 }
@@ -237,10 +274,10 @@ local_recipe_supported() {
     local tool="$1"
     local installer
     case "$tool" in
-        stow|tmux|go)
+        stow|tmux|go|uv|neovim|tree-sitter)
             installer="$(local_source_installer "$tool")"
             if [ ! -x "$installer" ]; then
-                printf '%s\n' "No supported source installer for $tool: $installer" >&2
+                printf '%s\n' "No supported standalone installer for $tool: $installer" >&2
                 return 1
             fi
             ;;
@@ -320,8 +357,8 @@ install_local_tool() {
         [ "$status" -eq 0 ] || return "$status"
     fi
     case "$tool" in
-        go)
-            "$SOURCE_GO_INSTALLER" --prefix "$HOME/.local"
+        go|uv|neovim|tree-sitter)
+            "$(local_source_installer "$tool")" --prefix "$HOME/.local"
             return $?
             ;;
         fzf)
@@ -333,6 +370,14 @@ install_local_tool() {
             # carry a stale user GOROOT into the local build.
             # The shallow commit pin has no tags for upstream git describe.
             (cd "$source_dir" && unset GOROOT && make bin/fzf FZF_VERSION=0.74.0 FZF_REVISION=6765f464)
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            # ble.sh discovers these relative to the executable's prefix.
+            # Keep scripts from the same pin before the checkout is removed.
+            mkdir -p "$HOME/.local/share/fzf/shell"
+            status=$?
+            [ "$status" -eq 0 ] || return "$status"
+            cp "$source_dir/shell/completion.bash" "$source_dir/shell/key-bindings.bash" "$HOME/.local/share/fzf/shell/"
             status=$?
             [ "$status" -eq 0 ] || return "$status"
             cp "$source_dir/bin/fzf" "$HOME/.local/bin/fzf"
@@ -383,6 +428,9 @@ for tool in "${SPECIFIC_PACKAGES[@]}"; do
     fi
     MISSING_TOOLS+=("$tool")
     LOCAL_MODE=false
+    # Keep the editor/tool versions compatible with the tracked configuration
+    # rather than relying on distribution package versions or system Python.
+    case "$tool" in uv|neovim|tree-sitter) LOCAL_MODE=true ;; esac
     if [ "$USE_SUDO" = false ]; then
         if [ "$PLATFORM" != macos ] || \
            [ "$tool" = stow ] || [ "$tool" = tmux ] || \
@@ -431,6 +479,38 @@ if [ "${#MISSING_TOOLS[@]}" -eq 0 ]; then
     exit 0
 fi
 
+# Validate the native transaction before any local installer can mutate HOME.
+if [ "${#MANAGER_PACKAGES[@]}" -gt 0 ]; then
+    MANAGER=''
+    case "$PLATFORM" in
+        macos) MANAGER=brew ;;
+        arch) MANAGER=pacman ;;
+        debian) MANAGER=apt-get ;;
+    esac
+    if ! command -v "$MANAGER" >/dev/null 2>&1; then
+        printf '%s\n' "Required package manager is not installed: $MANAGER" >&2
+        exit 1
+    fi
+    if [ "$PLATFORM" = debian ]; then
+        if ! command -v apt-cache >/dev/null 2>&1; then
+            printf '%s\n' 'apt-cache is required to verify Debian package availability before installation' >&2
+            exit 1
+        fi
+        for package_name in "${MANAGER_PACKAGES[@]}"; do
+            package_info="$(apt-cache show "$package_name" 2>/dev/null || true)"
+            if [ -z "$package_info" ]; then
+                printf '%s\n' "Debian package is unavailable in the configured repositories: $package_name" >&2
+                PREFLIGHT_FAILURE=true
+            fi
+        done
+        [ "$PREFLIGHT_FAILURE" = false ] || exit 1
+    fi
+    if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ] && ! command -v sudo >/dev/null 2>&1; then
+        printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
+        exit 1
+    fi
+fi
+
 if [ "$SOURCE_STOW" = true ]; then
     printf '%s\n' 'Delegating stow to its standalone source installer without sudo'
     "$SOURCE_STOW_INSTALLER" --prefix "$HOME/.local"
@@ -450,28 +530,28 @@ if [ "$SOURCE_TMUX" = true ]; then
     fi
 fi
 
-if [ "$USE_SUDO" = false ]; then
-    printf '%s\n' "Building remaining local tool(s) without sudo: ${LOCAL_TOOLS[*]}"
+if [ "${#LOCAL_TOOLS[@]}" -gt 0 ]; then
+    printf '%s\n' "Installing local tool(s) without sudo: ${LOCAL_TOOLS[*]}"
     for tool in "${LOCAL_TOOLS[@]}"; do
         case "$tool" in
             stow|tmux) continue ;;
-            go) printf '%s\n' 'Installing Go from the official release archive' ;;
+            go|uv|neovim) printf '%s\n' "Installing $tool from its official release archive" ;;
+            tree-sitter) printf '%s\n' 'Installing Tree-sitter with its standalone compatibility-aware installer' ;;
             *) printf '%s\n' "Building $tool from its pinned source revision" ;;
         esac
         install_local_tool "$tool"
         status=$?
         if [ "$status" -ne 0 ]; then
-            printf '%s\n' "Local build failed for $tool (status $status)" >&2
+            printf '%s\n' "Local installation failed for $tool (status $status)" >&2
             exit "$status"
         fi
     done
-    # Linux no-sudo has no native manager path.  macOS may still have
-    # Homebrew packages queued, so continue to its manager only in that case.
-    if [ "$PLATFORM" != macos ] || [ "${#MANAGER_PACKAGES[@]}" -eq 0 ]; then
+    # Continue to the native manager only when packages are actually queued.
+    if [ "${#MANAGER_PACKAGES[@]}" -eq 0 ]; then
         POST_FAILURE=false
         for tool in "${MISSING_TOOLS[@]}"; do
             if ! is_tool_installed "$tool"; then
-                printf '%s\n' "Local build completed but $tool is unavailable" >&2
+                printf '%s\n' "Local installation completed but $tool is unavailable" >&2
                 POST_FAILURE=true
             fi
         done
@@ -479,36 +559,6 @@ if [ "$USE_SUDO" = false ]; then
         printf '%s\n' 'Local dependency installation complete.'
         exit 0
     fi
-fi
-
-MANAGER=''
-case "$PLATFORM" in
-    macos) MANAGER=brew ;;
-    arch) MANAGER=pacman ;;
-    debian) MANAGER=apt-get ;;
-esac
-
-if ! command -v "$MANAGER" >/dev/null 2>&1; then
-    printf '%s\n' "Required package manager is not installed: $MANAGER" >&2
-    exit 1
-fi
-if [ "$PLATFORM" = debian ]; then
-    if ! command -v apt-cache >/dev/null 2>&1; then
-        printf '%s\n' 'apt-cache is required to verify Debian package availability before installation' >&2
-        exit 1
-    fi
-    for package_name in "${MANAGER_PACKAGES[@]}"; do
-        package_info="$(apt-cache show "$package_name" 2>/dev/null || true)"
-        if [ -z "$package_info" ]; then
-            printf '%s\n' "Debian package is unavailable in the configured repositories: $package_name" >&2
-            PREFLIGHT_FAILURE=true
-        fi
-    done
-    [ "$PREFLIGHT_FAILURE" = false ] || exit 1
-fi
-if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ] && ! command -v sudo >/dev/null 2>&1; then
-    printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
-    exit 1
 fi
 
 printf '%s\n' "Installing package(s): ${MANAGER_PACKAGES[*]}"

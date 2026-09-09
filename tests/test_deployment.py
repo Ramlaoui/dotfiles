@@ -265,6 +265,455 @@ esac
             self.assertEqual((old_root / "go").read_text(), "old installation\n")
 
 
+class NeovimInstallerTest(unittest.TestCase):
+    def test_corrupt_upgrade_preserves_existing_install_then_accepts_valid_archive(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            prefix = root / "prefix"
+            home = root / "home"
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            home.mkdir()
+
+            version = "v0.12.5"
+            archive_root_name = "nvim-linux-x86_64"
+            payload = root / "payload" / archive_root_name
+            (payload / "bin").mkdir(parents=True)
+            (payload / "lib").mkdir()
+            (payload / "share").mkdir()
+            nvim = payload / "bin" / "nvim"
+            nvim.write_text("#!/bin/sh\nprintf '%s\\n' new-neovim\n")
+            nvim.chmod(0o755)
+            archive = root / "nvim-linux-x86_64.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                tar.add(payload, arcname=archive_root_name)
+            checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+            corrupt_archive = root / "corrupt.tar.gz"
+            corrupt_archive.write_bytes(archive.read_bytes() + b"corrupted\n")
+
+            old_root = prefix / "lib" / "nvim-v0.12.4"
+            old_nvim = old_root / "bin" / "nvim"
+            old_nvim.parent.mkdir(parents=True)
+            old_nvim.write_text("#!/bin/sh\nprintf '%s\\n' old-neovim\n")
+            old_nvim.chmod(0o755)
+            (old_root / "lib").mkdir()
+            (old_root / "share").mkdir()
+            (prefix / "bin").mkdir(parents=True)
+            old_link = "../lib/nvim-v0.12.4/bin/nvim"
+            (prefix / "bin" / "nvim").symlink_to(old_link)
+
+            for command in (
+                "awk",
+                "bash",
+                "cp",
+                "env",
+                "gzip",
+                "ln",
+                "mkdir",
+                "mktemp",
+                "mv",
+                "readlink",
+                "rm",
+                "sed",
+                "tar",
+                "tr",
+            ):
+                source = shutil.which(command)
+                if source is None:
+                    self.fail(f"required test utility is unavailable: {command}")
+                (fake_bin / command).symlink_to(source)
+
+            for command in ("sha256sum", "shasum"):
+                source = shutil.which(command)
+                if source:
+                    (fake_bin / command).symlink_to(source)
+                    break
+            else:
+                self.fail("required checksum utility is unavailable")
+
+            uname = fake_bin / "uname"
+            uname.write_text(
+                '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n'
+            )
+            uname.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                """#!/bin/sh
+set -eu
+output=
+url=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --output) output=$2; shift ;;
+        *) url=$1 ;;
+    esac
+    shift
+done
+case "$url" in
+    https://github.com/neovim/neovim/releases/expanded_assets/v0.12.5)
+        printf '%s\n' \
+            '<li><a href="/neovim/neovim/releases/download/v0.12.5/nvim-linux-arm64.tar.gz">' \
+            '<span>nvim-linux-arm64.tar.gz</span>' \
+            '<span>sha256:0000000000000000000000000000000000000000000000000000000000000000</span>' \
+            '<li><a href="/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz">' \
+            '<span>nvim-linux-x86_64.tar.gz</span>' \
+            "<span>sha256:$NEOVIM_CHECKSUM</span>" \
+            '<li><a href="/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.appimage">' \
+            '<span>nvim-linux-x86_64.appimage</span>' \
+            '<span>sha256:1111111111111111111111111111111111111111111111111111111111111111</span>' \
+            > "$output"
+        ;;
+    https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz)
+        cp "$ARCHIVE_TO_SERVE" "$output"
+        ;;
+    *) exit 1 ;;
+esac
+"""
+            )
+            curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home),
+                    "PATH": str(fake_bin),
+                    "NEOVIM_CHECKSUM": checksum,
+                    "ARCHIVE_TO_SERVE": str(corrupt_archive),
+                }
+            )
+            installer = ROOT / "scripts" / "misc" / "install_neovim.sh"
+            result = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertEqual((prefix / "bin" / "nvim").readlink(), Path(old_link))
+            old_consumer = subprocess.run(
+                [str(prefix / "bin" / "nvim"), "--version"],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(old_consumer.returncode, 0, old_consumer.stdout)
+            self.assertEqual(old_consumer.stdout, "old-neovim\n")
+            self.assertFalse((prefix / "lib" / f"nvim-{version}").exists())
+            collision_root = prefix / "lib" / f"nvim-{version}"
+            collision_sentinel = collision_root / "sentinel"
+            collision_root.mkdir(parents=True)
+            collision_sentinel.write_text("do not overwrite\n")
+            env["ARCHIVE_TO_SERVE"] = str(archive)
+            collision = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertNotEqual(collision.returncode, 0, collision.stdout)
+            self.assertEqual(collision_sentinel.read_text(), "do not overwrite\n")
+            self.assertEqual((prefix / "bin" / "nvim").readlink(), Path(old_link))
+            shutil.rmtree(collision_root)
+
+
+
+            env["ARCHIVE_TO_SERVE"] = str(archive)
+            accepted = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stdout)
+            new_root = prefix / "lib" / f"nvim-{version}"
+            self.assertTrue((new_root / "bin" / "nvim").is_file())
+            self.assertTrue((new_root / "lib").is_dir())
+            self.assertTrue((new_root / "share").is_dir())
+            self.assertEqual(
+                (prefix / "bin" / "nvim").readlink(),
+                Path(f"../lib/nvim-{version}/bin/nvim"),
+            )
+            consumer = subprocess.run(
+                [str(prefix / "bin" / "nvim"), "--version"],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(consumer.returncode, 0, consumer.stdout)
+            self.assertEqual(consumer.stdout, "new-neovim\n")
+            self.assertEqual(old_nvim.read_text(), "#!/bin/sh\nprintf '%s\\n' old-neovim\n")
+
+            repeated = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertEqual(repeated.returncode, 0, repeated.stdout)
+            self.assertEqual(
+                (prefix / "bin" / "nvim").readlink(),
+                Path(f"../lib/nvim-{version}/bin/nvim"),
+            )
+
+class UvInstallerTest(unittest.TestCase):
+    def test_corrupt_upgrade_preserves_existing_install_then_accepts_valid_archive(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            prefix = root / "prefix"
+            home = root / "home"
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            home.mkdir()
+
+            version = "0.8.17"
+            archive_root_name = "uv-x86_64-unknown-linux-gnu"
+            payload = root / "payload" / archive_root_name
+            payload.mkdir(parents=True)
+            for name, output in (("uv", "new-uv"), ("uvx", "new-uvx")):
+                path = payload / name
+                path.write_text(f"#!/bin/sh\nprintf '%s\\n' {output}\n")
+                path.chmod(0o755)
+            archive_name = f"{archive_root_name}.tar.gz"
+            archive = root / archive_name
+            with tarfile.open(archive, "w:gz") as tar:
+                tar.add(payload, arcname=archive_root_name)
+            checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+            corrupt_archive = root / "corrupt.tar.gz"
+            corrupt_archive.write_bytes(archive.read_bytes() + b"corrupted\n")
+
+            old_root = prefix / "lib" / "uv-0.8.16"
+            old_root.mkdir(parents=True)
+            for name in ("uv", "uvx"):
+                path = old_root / name
+                path.write_text(f"#!/bin/sh\nprintf '%s\\n' old-{name}\n")
+                path.chmod(0o755)
+            (prefix / "bin").mkdir(parents=True)
+            old_links = {
+                name: f"../lib/uv-0.8.16/{name}" for name in ("uv", "uvx")
+            }
+            for name, target in old_links.items():
+                (prefix / "bin" / name).symlink_to(target)
+
+            for command in (
+                "bash",
+                "chmod",
+                "cp",
+                "env",
+                "gzip",
+                "ln",
+                "mkdir",
+                "mktemp",
+                "mv",
+                "readlink",
+                "rm",
+                "sed",
+                "tar",
+                "tr",
+            ):
+                source = shutil.which(command)
+                if source is None:
+                    self.fail(f"required test utility is unavailable: {command}")
+                (fake_bin / command).symlink_to(source)
+
+            for command in ("sha256sum", "shasum"):
+                source = shutil.which(command)
+                if source:
+                    (fake_bin / command).symlink_to(source)
+                    break
+            else:
+                self.fail("required checksum utility is unavailable")
+
+            uname = fake_bin / "uname"
+            uname.write_text(
+                '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac\n'
+            )
+            uname.chmod(0o755)
+            curl = fake_bin / "curl"
+            curl.write_text(
+                f"""#!/bin/sh
+set -eu
+output=
+url=
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --output) output=$2; shift ;;
+        *) url=$1 ;;
+    esac
+    shift
+done
+case "$url" in
+    https://releases.astral.sh/github/uv/releases/download/{version}/{archive_name}.sha256)
+        printf '%s  %s\\n' "$UV_CHECKSUM" "{archive_name}" > "$output"
+        ;;
+    https://releases.astral.sh/github/uv/releases/download/{version}/{archive_name})
+        cp "$ARCHIVE_TO_SERVE" "$output"
+        ;;
+    *) exit 1 ;;
+esac
+"""
+            )
+            curl.chmod(0o755)
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "HOME": str(home),
+                    "PATH": str(fake_bin),
+                    "UV_CHECKSUM": checksum,
+                    "ARCHIVE_TO_SERVE": str(corrupt_archive),
+                }
+            )
+            installer = ROOT / "scripts" / "misc" / "install_uv.sh"
+            result = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            for name, target in old_links.items():
+                link = prefix / "bin" / name
+                self.assertEqual(link.readlink(), Path(target))
+                old_consumer = subprocess.run(
+                    [str(link), "--version"],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(old_consumer.returncode, 0, old_consumer.stdout)
+                self.assertEqual(old_consumer.stdout, f"old-{name}\n")
+            self.assertFalse((prefix / "lib" / f"uv-{version}").exists())
+            collision_root = prefix / "lib" / f"uv-{version}"
+            collision_sentinel = collision_root / "sentinel"
+            collision_root.mkdir(parents=True)
+            collision_sentinel.write_text("do not overwrite\n")
+            env["ARCHIVE_TO_SERVE"] = str(archive)
+            collision = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertNotEqual(collision.returncode, 0, collision.stdout)
+            self.assertEqual(collision_sentinel.read_text(), "do not overwrite\n")
+            for name, target in old_links.items():
+                self.assertEqual((prefix / "bin" / name).readlink(), Path(target))
+            shutil.rmtree(collision_root)
+
+
+            env["ARCHIVE_TO_SERVE"] = str(archive)
+            accepted = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stdout)
+            new_root = prefix / "lib" / f"uv-{version}"
+            self.assertTrue((new_root / "uv").is_file())
+            self.assertTrue((new_root / "uvx").is_file())
+            for name in ("uv", "uvx"):
+                self.assertEqual(
+                    (prefix / "bin" / name).readlink(),
+                    Path(f"../lib/uv-{version}/{name}"),
+                )
+            consumer = subprocess.run(
+                [str(prefix / "bin" / "uv"), "--version"],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(consumer.returncode, 0, consumer.stdout)
+            self.assertEqual(consumer.stdout, "new-uv\n")
+            for name in ("uv", "uvx"):
+                self.assertEqual(
+                    (old_root / name).read_text(),
+                    f"#!/bin/sh\nprintf '%s\\n' old-{name}\n",
+                )
+
+            repeated = subprocess.run(
+                [str(installer), "--prefix", str(prefix), "--version", version],
+                cwd=ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            self.assertEqual(repeated.returncode, 0, repeated.stdout)
+            for name in ("uv", "uvx"):
+                self.assertEqual(
+                    (prefix / "bin" / name).readlink(),
+                    Path(f"../lib/uv-{version}/{name}"),
+                )
+
+
+
+
+class TreeSitterInstallerTest(unittest.TestCase):
+    def test_existing_release_requires_managed_link_without_deleting_content(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            prefix = root / "prefix"
+            release = prefix / "lib" / "tree-sitter-v0.27.0"
+            release.mkdir(parents=True)
+            sentinel = release / "keep"
+            sentinel.write_text("existing content\n")
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            curl = fake_bin / "curl"
+            curl.write_text("#!/bin/sh\nexit 99\n")
+            curl.chmod(0o755)
+            env = dict(os.environ, HOME=str(root), PATH=f"{fake_bin}{os.pathsep}{os.environ['PATH']}")
+            argv = [
+                str(ROOT / "scripts" / "misc" / "install_tree_sitter.sh"),
+                "--prefix", str(prefix), "--version", "0.27.0",
+            ]
+            rejected = subprocess.run(
+                argv, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            self.assertNotEqual(rejected.returncode, 0, rejected.stdout)
+            self.assertEqual(sentinel.read_text(), "existing content\n")
+
+            (release / "bin").mkdir()
+            binary = release / "bin" / "tree-sitter"
+            binary.write_text("#!/bin/sh\necho 'tree-sitter 0.26.0'\n")
+            binary.chmod(0o755)
+            (prefix / "bin").mkdir()
+            link = prefix / "bin" / "tree-sitter"
+            target = "../lib/tree-sitter-v0.27.0/bin/tree-sitter"
+            link.symlink_to(target)
+            mismatched = subprocess.run(
+                argv, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            self.assertNotEqual(mismatched.returncode, 0, mismatched.stdout)
+            self.assertEqual(sentinel.read_text(), "existing content\n")
+            binary.write_text("#!/bin/sh\necho 'tree-sitter 0.27.0'\n")
+            repeated = subprocess.run(
+                argv, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            )
+            self.assertEqual(repeated.returncode, 0, repeated.stdout)
+            self.assertEqual(link.readlink(), Path(target))
+            self.assertEqual(sentinel.read_text(), "existing content\n")
+
+
 class DependencyAdapterTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
@@ -329,6 +778,23 @@ class DependencyAdapterTest(unittest.TestCase):
         self.assertIn("<git-lfs><nodejs>", calls)
         self.assertNotIn("<git-lfs nodejs>", calls)
 
+    def test_editor_request_requires_compatible_editor_and_parser_cli(self):
+        for editor, parser, supported in (
+            ("0.12.0", "0.26.1", True),
+            ("0.11.9", "0.26.1", False),
+            ("0.12.0", "0.26.0", False),
+        ):
+            with self.subTest(editor=editor, parser=parser):
+                self.write_executable("nvim", f"#!/bin/sh\necho 'NVIM v{editor}'\n")
+                self.write_executable("tree-sitter", f"#!/bin/sh\necho 'tree-sitter {parser}'\n")
+                result = self.run_deps("--auto-yes", "neovim")
+                if supported:
+                    self.assertEqual(result.returncode, 0, result.stdout)
+                else:
+                    # This minimal host cannot install replacements. It must
+                    # not report success for an editor/CLI below the floor.
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+
     def test_no_sudo_never_invokes_sudo_and_reports_unsupported(self):
         self.write_executable(
             "sudo", '#!/bin/sh\necho invoked >> "$CALL_LOG"\nexit 99\n'
@@ -338,6 +804,11 @@ class DependencyAdapterTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertFalse(self.log.exists())
         self.assertIn("no supported deterministic local recipe", result.stdout.lower())
+
+    def test_missing_native_manager_refuses_before_local_install(self):
+        result = self.run_deps("--auto-yes", "uv", "git-lfs")
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertFalse((Path(self.env["HOME"]) / ".local").exists())
 
     def test_package_manager_failure_propagates_status(self):
         self.write_executable("sudo", '#!/bin/sh\nexec "$@"\n')
@@ -356,6 +827,31 @@ class DependencyAdapterTest(unittest.TestCase):
         self.assertEqual(result.returncode, 17, result.stdout)
         self.assertNotIn("Package manager", result.stdout)
         self.assertFalse(self.log.exists())
+
+    def test_stale_managed_fzf_refuses_repair_without_build_prerequisite(self):
+        managed_bin = Path(self.env["HOME"]) / ".local" / "bin" / "fzf"
+        managed_bin.parent.mkdir(parents=True)
+        old_binary = "#!/bin/sh\nprintf '0.74.0 (6765f464)\\n'\n"
+        managed_bin.write_text(old_binary)
+        managed_bin.chmod(0o755)
+        old_mode = stat.S_IMODE(managed_bin.stat().st_mode)
+
+        result = self.run_deps("--no-sudo", "--auto-yes", "fzf")
+
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(managed_bin.read_text(), old_binary)
+        self.assertEqual(stat.S_IMODE(managed_bin.stat().st_mode), old_mode)
+        self.assertFalse(
+            (Path(self.env["HOME"]) / ".local" / "share" / "fzf" / "shell").exists()
+        )
+
+    def test_external_fzf_without_integration_scripts_remains_accepted(self):
+        self.write_executable("fzf", "#!/bin/sh\nprintf 'external fzf\\n'\n")
+
+        result = self.run_deps("--no-sudo", "--auto-yes", "fzf")
+
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertFalse((Path(self.env["HOME"]) / ".local" / "bin" / "fzf").exists())
 
 
 if __name__ == "__main__":

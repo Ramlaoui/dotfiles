@@ -2,7 +2,6 @@
     defaultBranch = main
 [core]
     editor = nvim
-    pager = delta
 [push]
     default = simple
 [merge]
@@ -18,7 +17,3 @@
     wip = for-each-ref --sort='authordate:iso8601' --format=' %(color:green)%(authordate:relative)%09%(color:white)%(refname:short)' refs/heads
 [color]
     ui = auto
-[interactive]
-    diffFilter = delta --color-only
-[delta]
-    navigate = true    # use n and N to move between diff sections
