@@ -26,11 +26,44 @@ Select packages or tools explicitly:
 ./install.sh sync --with-omarchy
 ```
 
-All selected destinations are checked before linking. Existing conflicting files
-are not adopted, overwritten, or deleted; a conflict or command failure exits
-nonzero. Move conflicting configuration aside deliberately, then retry. A dry-run
-creates no target directories. A failure during actual linking can leave earlier
-successful operations linked; correct the cause and rerun.
+All selected destinations are checked before linking. By default, existing
+conflicting files are not adopted, overwritten, or deleted; sync exits nonzero.
+Move conflicting configuration aside deliberately, or opt into backups:
+
+```bash
+./install.sh sync --backup-conflicts --dry-run bash
+./install.sh sync --backup-conflicts bash
+```
+
+`--backup-conflicts` moves only conflicting regular files and leaf symlinks
+before Stowing the selected packages. Correct links and unrelated files are
+left alone. Directories, blocking parent paths, special files, and competing
+package destinations still require manual resolution. No settings are merged:
+the repository version becomes active; review the backup for settings to retain.
+
+Backups live in a private, unique
+`$HOME/.local/state/dotfiles/backups/invocation.XXXXXX/` directory, printed during
+sync. Its `files/` subtree preserves original absolute paths, and `manifest`
+contains alternating original and backup paths, each terminated by a NUL byte.
+Symlinks are moved as links, without copying their targets; a relative link may
+not resolve while stored in the backup. No backup directory is created when
+there are no conflicts. Backups are retained until you remove them deliberately.
+Backup storage paths must not traverse symlinks, including in the home-directory
+prefix; use a physical home path if yours is symlinked.
+
+A dry-run changes neither configuration nor backup storage. Backup-mode previews
+simulate Stow against private targets; actual sync checks the real targets again
+after moving conflicts. If backup-mode sync fails or receives a handled signal,
+it attempts to remove newly installed links and empty directories and restore
+displaced files. Recovery will not replace an occupied destination; failures are
+reported with the backup location. This is best-effort recovery, not protection
+against power loss, `SIGKILL`, or concurrent configuration changes.
+
+To restore manually, use the original/backup pair in the manifest: verify the
+original path is still the installed repository link, remove that link, then move
+the backup to its original path. Do not overwrite a file changed since sync.
+Without `--backup-conflicts`, a failure during actual linking can still leave
+earlier successful operations linked; correct the cause and rerun.
 
 Root files target `$HOME`; configuration subtrees target
 `${XDG_CONFIG_HOME:-$HOME/.config}`. macOS VS Code targets

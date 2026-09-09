@@ -21,7 +21,7 @@ GO_INSTALLER = ROOT / "scripts" / "misc" / "install_go.sh"
 class DeploymentTest(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
-        self.home = Path(self.tempdir.name) / "home"
+        self.home = Path(self.tempdir.name).resolve() / "home"
         self.home.mkdir()
         self.env = os.environ.copy()
         self.env.update(
@@ -47,8 +47,11 @@ class DeploymentTest(unittest.TestCase):
             check=False,
         )
 
+    def backup_root(self):
+        return self.home / ".local" / "state" / "dotfiles" / "backups"
+
     def backup_invocations(self):
-        root = self.home / ".local" / "state" / "dotfiles" / "backups"
+        root = self.backup_root()
         if not root.is_dir():
             return []
         return sorted(path for path in root.iterdir() if path.is_dir())
@@ -113,6 +116,7 @@ exec "$REAL_STOW" "$@"
         self.assertEqual(second.returncode, 0, second.stdout)
         self.assertEqual(os.readlink(link), first_target)
         self.assertEqual(self.backup_invocations(), [])
+        self.assertFalse(self.backup_root().exists())
 
     @unittest.skipUnless(shutil.which("stow"), "GNU Stow is not installed")
     def test_dry_run_does_not_create_targets(self):
@@ -126,6 +130,7 @@ exec "$REAL_STOW" "$@"
         sentinel = self.home / ".tmux.conf"
         sentinel.write_text("keep this file\n")
         result = self.run_install("sync", "tmux", "nvim")
+        self.assertFalse(self.backup_root().exists())
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(sentinel.read_text(), "keep this file\n")
         self.assertFalse((self.home / "custom-config" / "nvim").exists())
@@ -182,6 +187,7 @@ exec "$REAL_STOW" "$@"
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertTrue(regular_destination.is_file())
         self.assertFalse(regular_destination.is_symlink())
+        self.assertFalse(self.backup_root().exists())
         self.assertEqual(regular_destination.read_text(), "user tmux settings\n")
         self.assertTrue(symlink_destination.is_symlink())
         self.assertEqual(os.readlink(symlink_destination), str(original_symlink_target))
@@ -198,6 +204,7 @@ exec "$REAL_STOW" "$@"
         result = self.run_install("sync", "--backup-conflicts", "tmux")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(regular_destination.read_text(), "user tmux settings\n")
+        self.assertFalse(self.backup_root().exists())
         self.assertFalse(regular_destination.is_symlink())
         self.assertEqual(blocker.read_text(), "blocking path\n")
         self.assertEqual(self.backup_invocations(), [])
@@ -215,6 +222,10 @@ exec "$REAL_STOW" "$@"
         backup_root.parent.mkdir(parents=True)
         backup_root.symlink_to(external_root, target_is_directory=True)
 
+        preview = self.run_install("sync", "--backup-conflicts", "--dry-run", "tmux")
+        self.assertNotEqual(preview.returncode, 0, preview.stdout)
+        self.assertFalse((self.home / "custom-config").exists())
+
         result = self.run_install("sync", "--backup-conflicts", "tmux")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertTrue(backup_root.is_symlink())
@@ -223,6 +234,25 @@ exec "$REAL_STOW" "$@"
         self.assertFalse(regular_destination.is_symlink())
         self.assertEqual(marker.read_text(), "external data\n")
         self.assertEqual(sorted(path.name for path in external_root.iterdir()), ["do-not-touch"])
+        self.assertFalse((self.home / "custom-config").exists())
+
+    @unittest.skipUnless(shutil.which("stow"), "GNU Stow is not installed")
+    def test_backup_failure_removes_new_target_tree(self):
+        destination = self.home / ".tmux.conf"
+        destination.write_text("original\n")
+        env = self.write_fake_stow_that_fails_after_first_real_call()
+        env["PARTIAL_STOW_SOURCE"] = str(
+            ROOT / "tmux" / ".config" / "tmux" / "scripts" / "codex-sidebar"
+        )
+        env["PARTIAL_STOW_DESTINATION"] = str(
+            self.home / "custom-config" / "tmux" / "scripts" / "codex-sidebar"
+        )
+        result = self.run_install("sync", "--backup-conflicts", "tmux", env=env)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(Path(env["STOW_CALL_COUNT"]).read_text(), "2\n", result.stdout)
+        self.assertEqual(destination.read_text(), "original\n")
+        self.assertFalse(destination.is_symlink())
+        self.assertFalse((self.home / "custom-config").exists())
 
     @unittest.skipUnless(shutil.which("stow"), "GNU Stow is not installed")
     def test_partial_stow_failure_restores_backups_and_keeps_correct_links(self):
@@ -231,7 +261,7 @@ exec "$REAL_STOW" "$@"
         correct_source = ROOT / "tmux" / ".config" / "tmux" / "tmux.conf"
         correct_link = self.home / "custom-config" / "tmux" / "tmux.conf"
         correct_link.parent.mkdir(parents=True)
-        correct_link.symlink_to(correct_source)
+        correct_link.symlink_to(os.path.relpath(correct_source, correct_link.parent))
         original_link = os.readlink(correct_link)
 
         partial_source = (
@@ -261,6 +291,7 @@ exec "$REAL_STOW" "$@"
         result = self.run_install("deps", "--backup-conflicts")
         self.assertEqual(result.returncode, 2, result.stdout)
         self.assertEqual(self.backup_invocations(), [])
+        self.assertFalse(self.backup_root().exists())
 
     @unittest.skipUnless(shutil.which("stow"), "GNU Stow is not installed")
     def test_custom_xdg_config_target(self):
