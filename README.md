@@ -118,7 +118,7 @@ export PATH="$HOME/.local/bin:$PATH"
 go version
 
 # On Linux, including distro environments without a native adapter (such as
-# SLES on LUMI), this bootstraps Go first when fzf is missing, then builds the
+# SLES), this bootstraps Go first when fzf is missing, then builds the
 # pinned fzf revision locally without sudo.
 ./install.sh deps --no-sudo --auto-yes fzf
 fzf --version
@@ -151,7 +151,7 @@ files or change the fzf pin.
 ### User-local uv and Neovim toolchain
 
 ```bash
-# Works without a distro package manager, including SLES on LUMI.
+# Works without a distro package manager, including SLES.
 # Requesting Neovim also includes its Tree-sitter CLI dependency.
 ./install.sh deps --no-sudo --auto-yes uv neovim
 export PATH="$HOME/.local/bin:$PATH"

@@ -132,7 +132,7 @@ if [ "$OS_NAME" = Darwin ] || [ "$OS_NAME" = macOS ]; then
     PLATFORM=macos
 elif [ "$OS_NAME" = Linux ]; then
     # A no-sudo request must remain usable on distributions without a native
-    # adapter (for example SLES on LUMI): local recipes do not need a distro
+    # adapter (for example SLES): local recipes do not need a distro
     # identity.  Sudo-backed requests still require an explicit supported
     # native adapter below.
     if [ "$USE_SUDO" = false ]; then
