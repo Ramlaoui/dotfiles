@@ -90,13 +90,6 @@ _zsh_tmux_sidebar() {
 }
 
 codex-sidebar() { _zsh_tmux_sidebar "$@"; }
-codex() {
-    if [[ -n "${TMUX:-}" && -n "${TMUX_PANE:-}" ]]; then
-        _zsh_tmux_sidebar "$@"
-    else
-        command codex "$@"
-    fi
-}
 
 rsync() {
     local exclude=${XDG_CONFIG_HOME:-$HOME/.config}/rsync/.rsync.exclude
