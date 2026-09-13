@@ -80,17 +80,6 @@ tresizeup() { tmux resize-pane -U "$@"; }
 tresizedown() { tmux resize-pane -D "$@"; }
 tresizeright() { tmux resize-pane -R "$@"; }
 
-_zsh_tmux_sidebar() {
-    local script="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/scripts/codex-sidebar"
-    if [[ ! -x "$script" ]]; then
-        print -u2 "codex sidebar helper is unavailable: $script"
-        return 127
-    fi
-    "$script" "$@"
-}
-
-codex-sidebar() { _zsh_tmux_sidebar "$@"; }
-
 rsync() {
     local exclude=${XDG_CONFIG_HOME:-$HOME/.config}/rsync/.rsync.exclude
     if [[ -r "$exclude" ]]; then
