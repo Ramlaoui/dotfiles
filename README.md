@@ -208,7 +208,7 @@ installation still needs Git, network access, and a working C compiler.
   Omarchy theme adapter. Launching Neovim can bootstrap the pinned lazy.nvim
   revision and install missing plugins; sync itself does not run Neovim or install
   its plugins. Lazy also checks for plugin updates.
-- `tmux/.config/tmux/scripts/`: installed sidebar/worktree and pane borrowing/return
+- `tmux/.config/tmux/scripts/`: installed worktree and pane borrowing/return
   helpers (tmux and fzf required for interactive pane selection).
 - `tmux-switcher` is installed through TPM (`Ramlaoui/tmux-switcher`) and requires
   `uv`, a recent `fzf` (verified with 0.74.3; 0.56.0 cannot open the picker),

@@ -27,8 +27,8 @@ if ! command -v fzf >/dev/null 2>&1; then
 fi
 
 pane_rows="$(
-  tmux list-panes -a -F '#{pane_id}	#{session_name}:#{window_index}.#{pane_index}	#{pane_current_command}	#{pane_current_path}	#{@pane_role}' \
-    | awk -F '\t' -v current="$current_pane" '$1 != current && $5 != "sidebar" { print }'
+  tmux list-panes -a -F '#{pane_id}	#{session_name}:#{window_index}.#{pane_index}	#{pane_current_command}	#{pane_current_path}' \
+    | awk -F '\t' -v current="$current_pane" '$1 != current { print }'
 )"
 
 if [[ -z "$pane_rows" ]]; then
