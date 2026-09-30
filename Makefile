@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: install sync deps all dry-run no-sudo auto-yes help test
+.PHONY: install sync deps plugins all dry-run no-sudo auto-yes help test
 
 install:
 	./install.sh all
@@ -12,6 +12,9 @@ dry-run:
 
 deps:
 	./install.sh deps
+
+plugins:
+	./install.sh plugins
 
 all:
 	./install.sh all
@@ -31,7 +34,8 @@ help:
 	  '  sync       Preflight and link default dotfiles with GNU Stow' \
 	  '  dry-run    Show the sync plan without changing files' \
 	  '  deps       Install default dependencies' \
-	  '  all        Install dependencies, then sync default dotfiles' \
+	  '  plugins    Install TPM and missing tmux plugins' \
+	  '  all        Install dependencies, sync, then install tmux plugins' \
 	  '  no-sudo    Run deps without invoking sudo' \
 	  '  auto-yes   Run deps without prompting' \
 	  '  test       Run the Python unittest suite' \

@@ -5,7 +5,8 @@
 # The command deliberately has no side effects other than the selected phase:
 #   sync  - preflight and link configuration with GNU Stow (the default)
 #   deps  - install selected command-line dependencies
-#   all   install dependencies, then sync using their defaults
+#   plugins - install TPM and missing tmux plugins
+#   all   - install dependencies, sync, then install tmux plugins
 #
 # This script is written for the Bash shipped by macOS (Bash 3) as well as
 # newer Bash releases.  It does not use associative arrays or Bash 4-only
@@ -20,6 +21,15 @@ log_success() { printf '%s\n' "[OK] $1"; }
 log_error() { printf '%s\n' "[ERROR] $1" >&2; }
 log_warning() { printf '%s\n' "[WARN] $1" >&2; }
 
+install_tmux_plugins() {
+    local installer="$DOTFILES_DIR/scripts/installs/tmux-plugins.sh"
+    if [ ! -x "$installer" ]; then
+        log_error "Tmux plugin installer is missing or not executable: $installer"
+        return 1
+    fi
+    "$installer"
+}
+
 usage() {
     cat <<EOF
 Usage: $(basename "$0") <command> [options] [names...]
@@ -27,7 +37,8 @@ Usage: $(basename "$0") <command> [options] [names...]
 Commands:
   sync [packages...]  Preflight and link configuration with GNU Stow (default)
   deps [tools...]     Install command-line dependencies
-  all                 Install dependencies, then sync using their defaults
+  plugins             Install TPM and missing tmux plugins
+  all                 Install dependencies, sync, then install tmux plugins
 
 Sync options:
   --dry-run           Show the Stow plan without changing files
@@ -60,7 +71,7 @@ POSITIONAL=()
 # A leading command is optional: options without a command still mean sync.
 if [ "$#" -gt 0 ]; then
     case "$1" in
-        sync|deps|all)
+        sync|deps|plugins|all)
             COMMAND="$1"
             shift
             ;;
@@ -74,28 +85,28 @@ fi
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run)
-            if [ "$COMMAND" = deps ]; then
+            if [ "$COMMAND" = deps ] || [ "$COMMAND" = plugins ]; then
                 log_error "--dry-run is only valid for sync"
                 exit 2
             fi
             DRY_RUN=true
             ;;
         --with-omarchy)
-            if [ "$COMMAND" = deps ]; then
+            if [ "$COMMAND" = deps ] || [ "$COMMAND" = plugins ]; then
                 log_error "--with-omarchy is only valid for sync"
                 exit 2
             fi
             WITH_OMARCHY=true
             ;;
         --no-sudo)
-            if [ "$COMMAND" = sync ]; then
+            if [ "$COMMAND" = sync ] || [ "$COMMAND" = plugins ]; then
                 log_error "--no-sudo is only valid for deps"
                 exit 2
             fi
             NO_SUDO=true
             ;;
         --auto-yes)
-            if [ "$COMMAND" = sync ]; then
+            if [ "$COMMAND" = sync ] || [ "$COMMAND" = plugins ]; then
                 log_error "--auto-yes is only valid for deps"
                 exit 2
             fi
@@ -124,6 +135,15 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+if [ "$COMMAND" = plugins ]; then
+    if [ "${#POSITIONAL[@]}" -gt 0 ]; then
+        log_error "plugins does not accept package names"
+        exit 2
+    fi
+    install_tmux_plugins
+    exit $?
+fi
 
 if [ "$COMMAND" = all ]; then
     # all is the only orchestration command: bootstrap dependencies first so
@@ -513,7 +533,8 @@ if [ "$COMMAND" = sync ] || [ "$COMMAND" = all ]; then
     fi
 fi
 if [ "$ORCHESTRATED_ALL" = true ]; then
-    exit 0
+    install_tmux_plugins
+    exit $?
 fi
 
 # The deps command installs tools without runtime activation or shell mutation.

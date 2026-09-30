@@ -11,11 +11,13 @@ cd ~/dotfiles
 ./install.sh deps --auto-yes
 ./install.sh sync --dry-run
 ./install.sh sync
+./install.sh plugins
 ```
 
 `./install.sh` defaults to **sync only** and requires GNU Stow already in `PATH`.
-`./install.sh all` installs dependencies before linking the default packages.
-`make` shows help; `make sync`, `make deps`, and `make install` select these phases.
+`./install.sh all` installs dependencies, links the default packages, then installs
+TPM and missing tmux plugins. `make` shows help; `make sync`, `make deps`,
+`make plugins`, and `make install` select these phases.
 
 Select packages or tools explicitly:
 
@@ -43,6 +45,16 @@ Sync does not delete plugin directories, source a running tmux session, change
 your login shell, install plugins, or apply desktop defaults. Restart applications
 or reload their configuration deliberately after reviewing the links. Shell
 plugins must be installed separately; shell startup never downloads them.
+
+`./install.sh plugins` requires Git, tmux, and the synced tmux configuration.
+It bootstraps TPM from a pinned revision into
+`${XDG_CONFIG_HOME:-$HOME/.config}/tmux/plugins/tpm` and uses TPM's CLI to install
+missing declared plugins. Existing TPM and plugin checkouts are preserved and
+never updated or deleted by this phase. Installation uses a temporary tmux
+server without loading the configuration or changing running sessions. Errors
+return nonzero; `all` stops if dependencies, sync, or plugin installation fail.
+Plugin downloads require network access. Reload tmux with prefix+r afterward to
+activate them; prefix+I remains available for subsequent TPM installations.
 
 `scripts/installs/core-dependency.sh --help` lists canonical tool names. Native
 package adapters translate them into platform package names and preserve
