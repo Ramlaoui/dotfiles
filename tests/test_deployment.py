@@ -137,6 +137,24 @@ class DeploymentTest(unittest.TestCase):
         self.assertEqual(sentinel.read_text(), "untouched\n")
         self.assertIn("GNU Stow", result.stdout)
 
+    def test_all_stops_before_sync_when_dependencies_fail(self):
+        isolated = Path(self.tempdir.name) / "dotfiles"
+        deps = isolated / "scripts" / "installs" / "core-dependency.sh"
+        deps.parent.mkdir(parents=True)
+        shutil.copy2(INSTALL, isolated / "install.sh")
+        deps.write_text("#!/bin/sh\nexit 23\n")
+        deps.chmod(0o755)
+        result = subprocess.run(
+            [str(isolated / "install.sh"), "all", "--auto-yes"],
+            env=self.env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        )
+        self.assertEqual(result.returncode, 23, result.stdout)
+        self.assertIn("sync was not attempted", result.stdout)
+        self.assertNotIn("Preflighting", result.stdout)
+        self.assertNotIn("Selected sync package", result.stdout)
+        self.assertFalse((self.home / "custom-config").exists())
+
 
 
 class GoInstallerTest(unittest.TestCase):
@@ -740,6 +758,7 @@ class DependencyAdapterTest(unittest.TestCase):
                 self.fail(f"required test utility is unavailable: {command}")
             (self.fake_bin / command).symlink_to(source)
         Path(self.env["HOME"]).mkdir()
+        self.write_executable("id", "#!/bin/sh\necho 1000\n")
 
     def tearDown(self):
         self.tempdir.cleanup()
@@ -777,6 +796,44 @@ class DependencyAdapterTest(unittest.TestCase):
         calls = self.log.read_text()
         self.assertIn("<git-lfs><nodejs>", calls)
         self.assertNotIn("<git-lfs nodejs>", calls)
+
+    def test_debian_package_names_and_root_without_sudo(self):
+        self.env.update({
+            "DOTFILES_DISTRO": "debian",
+            "CALL_LOG": str(self.log),
+            "FAKE_BIN": str(self.fake_bin),
+        })
+        self.write_executable("id", "#!/bin/sh\necho 0\n")
+        self.write_executable(
+            "apt-cache",
+            '#!/bin/sh\ncase "$2" in golang-go|tealdeer) echo "Package: $2" ;; *) exit 1 ;; esac\n',
+        )
+        self.write_executable(
+            "apt-get",
+            '#!/bin/sh\nprintf \'<%s>\' "$@" > "$CALL_LOG"\ntouch "$FAKE_BIN/go" "$FAKE_BIN/tldr"\nchmod +x "$FAKE_BIN/go" "$FAKE_BIN/tldr"\n',
+        )
+        result = self.run_deps("--auto-yes", "go", "tldr")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.log.read_text(), "<install><-y><golang-go><tealdeer>")
+
+    def test_non_root_without_sudo_refuses_native_install(self):
+        self.write_executable("pacman", "#!/bin/sh\nexit 99\n")
+        result = self.run_deps("--auto-yes", "git-lfs")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("sudo is required", result.stdout)
+
+    def test_root_manager_failure_propagates_status(self):
+        self.write_executable("id", "#!/bin/sh\necho 0\n")
+        self.write_executable("pacman", "#!/bin/sh\nexit 23\n")
+        result = self.run_deps("--auto-yes", "git-lfs")
+        self.assertEqual(result.returncode, 23, result.stdout)
+
+    def test_root_no_sudo_keeps_local_recipe_semantics(self):
+        self.write_executable("id", "#!/bin/sh\necho 0\n")
+        self.write_executable("pacman", "#!/bin/sh\nexit 99\n")
+        result = self.run_deps("--no-sudo", "--auto-yes", "git-lfs")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("No supported deterministic local recipe", result.stdout)
 
     def test_editor_request_requires_compatible_editor_and_parser_cli(self):
         for editor, parser, supported in (

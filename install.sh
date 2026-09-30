@@ -146,6 +146,7 @@ if [ "$COMMAND" = all ]; then
     status=$?
     if [ "$status" -ne 0 ]; then
         log_error "Dependency phase failed (status $status); sync was not attempted"
+        exit "$status"
     fi
     ORCHESTRATED_ALL=true
     COMMAND=sync

@@ -181,11 +181,13 @@ platform_package_name() {
         arch:lazygit|debian:lazygit|macos:lazygit) printf '%s\n' lazygit ;;
         arch:bat|debian:bat|macos:bat) printf '%s\n' bat ;;
         arch:eza|debian:eza|macos:eza) printf '%s\n' eza ;;
-        arch:tldr|debian:tldr|macos:tldr) printf '%s\n' tldr ;;
+        arch:tldr|macos:tldr) printf '%s\n' tldr ;;
+        debian:tldr) printf '%s\n' tealdeer ;;
         arch:zsh|debian:zsh|macos:zsh) printf '%s\n' zsh ;;
         arch:htop|debian:htop|macos:htop) printf '%s\n' htop ;;
         arch:fzf|debian:fzf|macos:fzf) printf '%s\n' fzf ;;
-        arch:go|debian:go|macos:go) printf '%s\n' go ;;
+        arch:go|macos:go) printf '%s\n' go ;;
+        debian:go) printf '%s\n' golang-go ;;
         arch:tmux|debian:tmux|macos:tmux) printf '%s\n' tmux ;;
         arch:stow|debian:stow|macos:stow) printf '%s\n' stow ;;
         arch:ripgrep|debian:ripgrep|macos:ripgrep) printf '%s\n' ripgrep ;;
@@ -480,6 +482,7 @@ if [ "${#MISSING_TOOLS[@]}" -eq 0 ]; then
 fi
 
 # Validate the native transaction before any local installer can mutate HOME.
+PRIVILEGE_COMMAND=()
 if [ "${#MANAGER_PACKAGES[@]}" -gt 0 ]; then
     MANAGER=''
     case "$PLATFORM" in
@@ -505,9 +508,15 @@ if [ "${#MANAGER_PACKAGES[@]}" -gt 0 ]; then
         done
         [ "$PREFLIGHT_FAILURE" = false ] || exit 1
     fi
-    if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ] && ! command -v sudo >/dev/null 2>&1; then
-        printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
-        exit 1
+    if [ "$USE_SUDO" = true ] && [ "$PLATFORM" != macos ]; then
+        user_id="$(id -u)" || exit 1
+        if [ "$user_id" -ne 0 ]; then
+            if ! command -v sudo >/dev/null 2>&1; then
+                printf '%s\n' "sudo is required for $PLATFORM dependency installation; use --no-sudo for a supported local recipe" >&2
+                exit 1
+            fi
+            PRIVILEGE_COMMAND=(sudo)
+        fi
     fi
 fi
 
@@ -573,7 +582,7 @@ case "$PLATFORM" in
         fi
         ;;
     arch)
-        if sudo pacman -S --needed --noconfirm "${MANAGER_PACKAGES[@]}"; then
+        if "${PRIVILEGE_COMMAND[@]}" pacman -S --needed --noconfirm "${MANAGER_PACKAGES[@]}"; then
             :
         else
             status=$?
@@ -582,7 +591,7 @@ case "$PLATFORM" in
         fi
         ;;
     debian)
-        if sudo apt-get install -y "${MANAGER_PACKAGES[@]}"; then
+        if "${PRIVILEGE_COMMAND[@]}" apt-get install -y "${MANAGER_PACKAGES[@]}"; then
             :
         else
             status=$?
